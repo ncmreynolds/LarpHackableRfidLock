@@ -1,4 +1,14 @@
 LarpHackableRfidLock	KEYWORD1
+Lock	KEYWORD1
 
 //Setup
 begin	KEYWORD2
+Housekeeping	KEYWORD2
+RedLedOn	KEYWORD2
+RedLedOff	KEYWORD2
+GreenLedOn	KEYWORD2
+GreenLedOff	KEYWORD2
+BuzzerOn	KEYWORD2
+BuzzerOff	KEYWORD2
+CardPresented	KEYWORD2
+Reset	KEYWORD2
