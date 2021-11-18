@@ -78,7 +78,7 @@ The WeMos D1 mini has just enough pins free for this prop. Use the following wir
 
 Here's a shot of all this being tested on a breadboard.
 
-![](images\breadboard.png)
+![](images/breadboard.png)
 
 ## Cases
 
