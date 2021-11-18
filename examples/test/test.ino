@@ -7,12 +7,14 @@
 
 #include <LarpHackableRfidLock.h>
 
-uint32_t test_interval = 5000;
+uint32_t test_interval = 1000;
 uint32_t time_of_last_test = 0;
 uint8_t test_type = 0;
-uint8_t number_of_tests = 4;
+uint8_t number_of_tests = 6;
 
 void setup() {
+  Serial.begin(115200, SERIAL_8N1, SERIAL_TX_ONLY); //Note SERIAL_TX_ONLY allows use of RX for a button
+  Lock.Debug(Serial);
   Lock.begin(); //Start the lock
 }
 
@@ -23,11 +25,7 @@ void loop() {
     Lock.RedLedOn();
     Lock.GreenLedOn();
     Lock.BuzzerOn(220);
-    delay(1000);
-    Lock.RedLedOff();
-    Lock.GreenLedOff();
-    Lock.BuzzerOff();
-    test_type = 0;
+    test_type = 5;
     time_of_last_test = millis();
   }
 
@@ -37,20 +35,32 @@ void loop() {
     switch (test_type) {
     case 0:
       Lock.RedLedOn();
+      Lock.GreenLedOff();
+      Lock.BuzzerOff();
       break;
     case 1:
       Lock.RedLedOff();
+      Lock.GreenLedOff();
+      Lock.BuzzerOff();
       break;
     case 2:
+      Lock.RedLedOff();
       Lock.GreenLedOn();
+      Lock.BuzzerOff();
       break;
     case 3:
+      Lock.RedLedOff();
       Lock.GreenLedOff();
+      Lock.BuzzerOff();
       break;
     case 4:
+      Lock.RedLedOff();
+      Lock.GreenLedOff();
       Lock.BuzzerOn(440);
       break;
     case 5:
+      Lock.RedLedOff();
+      Lock.GreenLedOff();
       Lock.BuzzerOff();
       break;
     default:
