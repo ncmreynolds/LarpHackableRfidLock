@@ -33,9 +33,10 @@ class LarpHackableRfidLock	{
 		void BuzzerOff();														//Switch off buzzer
 		bool CardPresented();													//Has a card just been presented
 		bool Reset();															//Has the lock been reset
+		void Debug(Stream &);													//Enable debug output on a Serial stream
 	protected:
 	private:
-		uint32_t lock_uart_baudrate_ = 115200;									//BAUD rate for the lock UART interface
+		Stream *lock_uart = nullptr;											//The stream used for the terminal UART
 		uint8_t red_led_pin_ = D2;												//GPIO pin used for the red LED
 		uint8_t red_led_pin_on_value_ = HIGH;									//GPIO pin used for the red LED
 		uint8_t red_led_pin_off_value_ = LOW;									//GPIO pin used for the red LED
