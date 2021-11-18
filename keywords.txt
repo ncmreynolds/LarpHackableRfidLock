@@ -12,3 +12,4 @@ BuzzerOn	KEYWORD2
 BuzzerOff	KEYWORD2
 CardPresented	KEYWORD2
 Reset	KEYWORD2
+Debug	KEYWORD2
