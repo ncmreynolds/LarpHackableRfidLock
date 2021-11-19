@@ -12,10 +12,15 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <MFRC522.h>
-#if defined(ESP8266)
-  #define USE_LITTLEFS            true
-  #define ESP_DRD_USE_LITTLEFS    true
+#ifdef ESP8266
+	#define ESP8266_DRD_USE_RTC     false   //true
+	#define ESP_DRD_USE_LITTLEFS    true    //false
 #endif
+#define ESP_DRD_USE_EEPROM      false
+#define ESP_DRD_USE_SPIFFS      true
+//#define DOUBLERESETDETECTOR_DEBUG       true  //false
+#define DRD_TIMEOUT 3
+#define DRD_ADDRESS 0
 #include <ESP_DoubleResetDetector.h>
 
 class LarpHackableRfidLock	{
@@ -55,15 +60,16 @@ class LarpHackableRfidLock	{
 		MFRC522 MIFARE_device;													//Instance of the MFRC522
 		MFRC522::MIFARE_Key card_key;											//Instance of the MFRC522 MIFARE cardkey
 		uint8_t current_nuid[4];												//NUID of last presented card
+		bool card_present = false;												//Is card present
 		//Reset detection
 		DoubleResetDetector reset_detector;										//Double reset detector
-		int16_t reset_detector_timeout = 5;										//Time in seconds for reset detection
-		int16_t reset_detector_address = 0;										//Address of reset detection flag
 		//Wi-Fi
 		const char default_ssid[5] = "Lock";									//Default SSID when configuring lock
 		const char default_psk[8] = "LetMeIn";									//Default PSK when configuring lock
 		//Tones
 		uint16_t musicalTones[8] = { 1915, 1700, 1519, 1432, 1275, 1136, 1014, 956 };
+		//Tap code
+		
 };
 
 extern LarpHackableRfidLock Lock;

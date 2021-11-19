@@ -13,8 +13,8 @@
 
 
 LarpHackableRfidLock::LarpHackableRfidLock()	//Constructor function
-  : MIFARE_device(D8, D0),						//Calls constructor of class MFRC522, CS D8, RST D0
-  reset_detector(reset_detector_timeout, reset_detector_address)	//Calls constructor of class DoubleResetDetector
+  : MIFARE_device(D8, D1),						//Calls constructor of class MFRC522, CS D8, RST D1
+  reset_detector(DRD_TIMEOUT, DRD_ADDRESS)		//Calls constructor of class DoubleResetDetector
 {
 	//Use the default key from the factory: FFFFFFFFFFFF (hex) 
 	for (int i = 0; i < 6; i ++) {
@@ -128,15 +128,24 @@ bool ICACHE_FLASH_ATTR LarpHackableRfidLock::CardPresented() {
 		return(false);
 	}
 	if(this->MIFARE_device.PICC_ReadCardSerial() == false) {
+		if(card_present == true)
+		{
+			current_nuid[0] = 0;
+			current_nuid[1] = 0;
+			current_nuid[2] = 0;
+			current_nuid[3] = 0;
+			card_present = false;
+			if(lock_uart != nullptr)
+			{
+				lock_uart->print(F("Card removed"));
+			}
+		}
 		return(false);
 	}
-	if(lock_uart != nullptr)
+	MFRC522::PICC_Type piccType = this->MIFARE_device.PICC_GetType(this->MIFARE_device.uid.sak);
+	if(lock_uart != nullptr && card_present == false)
 	{
 		lock_uart->print(F("PICC type: "));
-	}
-	MFRC522::PICC_Type piccType = this->MIFARE_device.PICC_GetType(this->MIFARE_device.uid.sak);
-	if(lock_uart != nullptr)
-	{
 		lock_uart->print(this->MIFARE_device.PICC_GetTypeName(piccType));
 	}
 	if (piccType != MFRC522::PICC_TYPE_MIFARE_MINI &&  
@@ -146,20 +155,28 @@ bool ICACHE_FLASH_ATTR LarpHackableRfidLock::CardPresented() {
 		{
 			lock_uart->println(F(" tag is not of type MIFARE Classic."));
 		}
+		card_present = false;
 		return(false);
 	}
-	else if(lock_uart != nullptr)
+	else if(lock_uart != nullptr && card_present == false)
 	{
 		lock_uart->println();
 	}
-    for (uint8_t i = 0; i < 4; i++) {
-      current_nuid[i] = this->MIFARE_device.uid.uidByte[i];
-    }
-	if(lock_uart != nullptr)
-	{
-		lock_uart->printf("Card NUID:%02x:%02x:%02x:%02x\r\n",current_nuid[0],current_nuid[1],current_nuid[2],current_nuid[3]);
+	card_present = true;
+	if(current_nuid[0] != MIFARE_device.uid.uidByte[0] ||
+		current_nuid[1] != MIFARE_device.uid.uidByte[1] ||
+		current_nuid[2] != MIFARE_device.uid.uidByte[2] ||
+		current_nuid[3] != MIFARE_device.uid.uidByte[3]) {
+		for (uint8_t i = 0; i < 4; i++) {
+		  current_nuid[i] = this->MIFARE_device.uid.uidByte[i];
+		}
+		if(lock_uart != nullptr)
+		{
+			lock_uart->printf("New card NUID:%02x:%02x:%02x:%02x\r\n",current_nuid[0],current_nuid[1],current_nuid[2],current_nuid[3]);
+		}
+		return(true);
 	}
-	return(true);
+	return(false);
 }
 
 bool ICACHE_FLASH_ATTR LarpHackableRfidLock::Reset() {
