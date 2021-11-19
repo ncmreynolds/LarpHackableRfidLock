@@ -10,16 +10,17 @@ Code, circuits and 3D printable enclosures for a 'hackable' RFID lock prop usabl
 - Clear visual and audible feedback when presenting a card
 - Multiple software options (local card database, MQTT server etc.) for validating cards
 - Multiple 'hacking' options by physical interaction or smartphone/tablet connection
-- Easy to reset to defaults before/during/after events, no reprogramming/rebuilding
+- Easy to reset to defaults before/during/after events, no reprogramming/rebuilding. **Have settled on '[double reset detector](https://github.com/khoih-prog/ESP_DoubleResetDetector)' as it's a reasonably well supported library and this uses no more pins.**
 - Power by USB charger or batteries
-- Removable AA batteries, easy to buy and change, because you **will** forget to charge them at some point
-- Battery life of ~48 hours for 'weekend' games, this may be hard to manage without using deep sleep during periods of long inactivity or programmed time out hours.
+- Batteries will be removable AAs, as they easy to buy and change, because you **will** forget to charge them at some point
+- Battery life of ~48 hours for 'weekend' games, this may be hard to manage without using deep sleep during periods of long inactivity or programmed time out hours. Ideally, some method of monitoring battery voltage and warning of low battery, probably just a voltage divider read by the analogue input.
 
 ## Proposed 'hacking' methods
 
-- Connect to local Wi-Fi hotspot and play a simple mini-game to gain control, perhaps 'Simon says' or 'whack-a-mole'
-- Use one or two buttons to enter a code, probably using [Tap Code](https://en.wikipedia.org/wiki/Tap_code), perhaps issued at game start or discovered in play
+- Connect to local Wi-Fi hotspot with a phone/tablet and play a simple mini-game to gain control, perhaps 'Simon says' or 'whack-a-mole'
+- Use one or two buttons to enter a code, probably using [Tap Code](https://en.wikipedia.org/wiki/Tap_code), perhaps issued at game start or discovered in play. **A 'tap code' [library](https://github.com/ncmreynolds/TapCode) has now been written for this purpose**.
 - Connect a physical dongle/wire handed to 'hackers' at game start or discovered in play
+- Connect a USB cable and interact through a UART interface. Requires a laptop and a bit of coaching for the players, would be really but great for 'style'
 - 'Hack' the MQTT server it connects to for authorising cards (out of scope at present)
 - Maybe combinations of the above depending on the level of difficulty and time needed
 
@@ -57,7 +58,8 @@ The WeMos D1 mini has just enough pins free for this prop. Use the following wir
 - RFID MISO to pin D6 of the D1 mini
 - RFID SCK (CLK) to pin D5 of the D1 mini
 - RFID SDA (CS) to pin D8 of the D1 mini
-- RFID RST (Reset) to pin D0 of the D1 mini
+- RFID RST (Reset) to pin D1 of the D1 mini
+- D0 of the D1 mini looped to RST of the D1 mini. This is to allow deep sleep for power saving.
 - Battery holder + (red wire) to 5V of the D1 mini
 - Battery holder - (black wire) to GND
 
@@ -70,7 +72,7 @@ The WeMos D1 mini has just enough pins free for this prop. Use the following wir
 #### Optional button
 
 - Connect one terminal to GND
-- Connect one terminal to D1 of the D1 mini
+- Connect one terminal to RX of the D1 mini
 
 Here's a shot of all this being tested on a breadboard.
 
