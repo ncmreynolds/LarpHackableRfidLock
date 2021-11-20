@@ -13,7 +13,7 @@
 
 
 LarpHackableRfidLock::LarpHackableRfidLock()	//Constructor function
-  : MIFARE_device(D8, D1),						//Calls constructor of class MFRC522, CS D8, RST D1
+  : MIFARE_device(D8, D3),						//Calls constructor of class MFRC522, CS D8, RST D3
   reset_detector(DRD_TIMEOUT, DRD_ADDRESS)		//Calls constructor of class DoubleResetDetector
 {
 	//Use the default key from the factory: FFFFFFFFFFFF (hex) 

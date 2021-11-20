@@ -39,6 +39,25 @@ class LarpHackableRfidLock	{
 		bool CardPresented();													//Has a card just been presented
 		bool Reset();															//Has the lock been reset
 		void Debug(Stream &);													//Enable debug output on a Serial stream
+		//Higher level lock control
+		enum class lockEvent : uint8_t {open, unlock, lock, sleep};
+		void open();															//Unlocks briefly to allow the door to open and people to pass
+		void unlock();															//Unlock, allowing the door to open freely
+		void lock();															//Lock, preventing the door from opening even with normally valid access
+		void sleep(uint32_t);													//Deep sleep for an amount of time
+		//Card database
+		bool initialiseCardDatabase(uint8_t size = 64);							//Initialises the card database
+		bool eraseCardDatabase();												//Erases the card database
+		bool loadCardDatabase();												//Loads the card database from storage
+		bool saveCardDatabase(bool force = false);								//Saves the card database to storage if changed (or forced)
+		bool cardRegistered(uint8_t* id);										//Returns true if the card is registered in the database
+		bool addCard(uint8_t* id);												//Add a card to the database
+		bool removeCard(uint8_t* id);											//Remove a card from the database
+		bool authoriseCard(uint8_t* id);										//Authorise a card for this lock
+		bool revokeCard(uint8_t* id);											//Revoke the authorisation for a card for this lock
+		//Tap code
+		bool enableTapCode();													//Enables the use of tap code on the lock
+		bool setTapCode(char*, uint8_t);										//Set the tap code for an action
 	protected:
 	private:
 		Stream *lock_uart = nullptr;											//The stream used for the terminal UART
@@ -48,7 +67,7 @@ class LarpHackableRfidLock	{
 		uint8_t green_led_pin_ = D4;											//GPIO pin used for the green LED
 		uint8_t green_led_pin_on_value_ = HIGH;									//GPIO pin used for the green LED
 		uint8_t green_led_pin_off_value_ = LOW;									//GPIO pin used for the green LED
-		uint8_t buzzer_pin_ = D3;												//GPIO pin used for the buzzer
+		uint8_t buzzer_pin_ = D1;												//GPIO pin used for the buzzer
 		bool red_led_state_ = false;											//State of the red LED
 		uint32_t red_led_state_last_changed_ = 0;								//Time when the state of the red LED last changed
 		bool green_led_state_ = false;											//State of the green LED
@@ -69,6 +88,8 @@ class LarpHackableRfidLock	{
 		//Tones
 		uint16_t musicalTones[8] = { 1915, 1700, 1519, 1432, 1275, 1136, 1014, 956 };
 		//Tap code
+		TapCode* tapCode_ = nullptr;											//Pointer to the tap code class, if enabled
+		char* tapCodes[4];														//Array of pointers to tap codes for each event
 		
 };
 

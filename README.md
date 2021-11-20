@@ -58,7 +58,7 @@ The WeMos D1 mini has just enough pins free for this prop. Use the following wir
 - RFID MISO to pin D6 of the D1 mini
 - RFID SCK (CLK) to pin D5 of the D1 mini
 - RFID SDA (CS) to pin D8 of the D1 mini
-- RFID RST (Reset) to pin D1 of the D1 mini
+- RFID RST (Reset) to pin D3 of the D1 mini
 - D0 of the D1 mini looped to RST of the D1 mini. This is to allow deep sleep for power saving.
 - Battery holder + (red wire) to 5V of the D1 mini
 - Battery holder - (black wire) to GND
@@ -67,7 +67,7 @@ The WeMos D1 mini has just enough pins free for this prop. Use the following wir
 
 - Buzzer + to 5V of the D1 mini
 - Buzzer - to GND
-- Buzzer I/O to pin D3 of the D1 mini
+- Buzzer I/O to pin D1 of the D1 mini
 
 #### Optional button
 
