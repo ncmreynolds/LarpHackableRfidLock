@@ -4,12 +4,21 @@ Lock	KEYWORD1
 //Setup
 begin	KEYWORD2
 Housekeeping	KEYWORD2
+Reset	KEYWORD2
+Debug	KEYWORD2
+
+//Indicators
 RedLedOn	KEYWORD2
 RedLedOff	KEYWORD2
 GreenLedOn	KEYWORD2
 GreenLedOff	KEYWORD2
 BuzzerOn	KEYWORD2
 BuzzerOff	KEYWORD2
-CardPresented	KEYWORD2
-Reset	KEYWORD2
-Debug	KEYWORD2
+
+//RFID
+enableRFID	KEYWORD2
+CardPresent	KEYWORD2
+CardChanged	KEYWORD2
+
+//Tap code related
+enableTapCode	KEYWORD2
