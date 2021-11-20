@@ -10,8 +10,14 @@
 #ifndef LarpHackableRfidLock_h
 #define LarpHackableRfidLock_h
 #include <Arduino.h>
-#include <SPI.h>
-#include <MFRC522.h>
+//RFID reader
+//#include <SPI.h>
+//#include <MFRC522.h>
+#include <MFRC522v2.h>
+#include <MFRC522DriverSPI.h>
+#include <MFRC522DriverPinSimple.h>
+#include <MFRC522Debug.h>
+//Double reset detection
 #ifdef ESP8266
 	#define ESP8266_DRD_USE_RTC     false   //true
 	#define ESP_DRD_USE_LITTLEFS    true    //false
@@ -22,6 +28,8 @@
 #define DRD_TIMEOUT 3
 #define DRD_ADDRESS 0
 #include <ESP_DoubleResetDetector.h>
+//Tap code
+#include <TapCode.h>
 
 class LarpHackableRfidLock	{
 
@@ -34,9 +42,8 @@ class LarpHackableRfidLock	{
 		void RedLedOff();														//Switch off red LED
 		void GreenLedOn();														//Switch on green LED
 		void GreenLedOff();														//Switch off green LED
-		void BuzzerOn(uint16_t);												//Switch on buzzer, with a selected frequency
+		void BuzzerOn(uint16_t frequency = 440, uint32_t on_time = 100);		//Switch on buzzer, with a selected frequency and on time
 		void BuzzerOff();														//Switch off buzzer
-		bool CardPresented();													//Has a card just been presented
 		bool Reset();															//Has the lock been reset
 		void Debug(Stream &);													//Enable debug output on a Serial stream
 		//Higher level lock control
@@ -45,6 +52,12 @@ class LarpHackableRfidLock	{
 		void unlock();															//Unlock, allowing the door to open freely
 		void lock();															//Lock, preventing the door from opening even with normally valid access
 		void sleep(uint32_t);													//Deep sleep for an amount of time
+		//RFID
+		bool enableRFID();														//Enable RFID reading
+		bool CardPresent();														//Is a card just present?
+		bool CardChanged();														//Has it changed?
+		uint8_t* CardUID();														//Retrieve a pointer to the current UID
+		uint8_t CardUIDsize();													//Size of the current UID
 		//Card database
 		bool initialiseCardDatabase(uint8_t size = 64);							//Initialises the card database
 		bool eraseCardDatabase();												//Erases the card database
@@ -56,7 +69,7 @@ class LarpHackableRfidLock	{
 		bool authoriseCard(uint8_t* id);										//Authorise a card for this lock
 		bool revokeCard(uint8_t* id);											//Revoke the authorisation for a card for this lock
 		//Tap code
-		bool enableTapCode();													//Enables the use of tap code on the lock
+		void enableTapCode();													//Enables the use of tap code on the lock
 		bool setTapCode(char*, uint8_t);										//Set the tap code for an action
 	protected:
 	private:
@@ -74,12 +87,22 @@ class LarpHackableRfidLock	{
 		uint32_t green_led_state_last_changed_ = 0;								//Time when the state of the green LED last changed
 		bool buzzer_state_ = false;												//State of the buzzer
 		uint32_t buzzer_state_last_changed_ = 0;								//Time when the state of the buzzer last changed
+		uint32_t buzzer_on_time_ = 0;
 		uint32_t max_buzzer_on_time_ = 60000;									//Maximum buzzer on time, to avoid total irritation
 		//RFID related
-		MFRC522 MIFARE_device;													//Instance of the MFRC522
-		MFRC522::MIFARE_Key card_key;											//Instance of the MFRC522 MIFARE cardkey
-		uint8_t current_nuid[4];												//NUID of last presented card
-		bool card_present = false;												//Is card present
+		MFRC522DriverPinSimple rfid_ss_pin_;
+		MFRC522DriverSPI rfid_driver_;
+		MFRC522 rfid_reader_;
+		bool rfid_antenna_enabled_ = true;										//Tracks state of the RFID antenna
+		uint8_t current_uid_[10];												//UID of last presented card
+		uint8_t current_uid_size_ = 4;											//UID size will be 4, 7 or 10
+		bool card_present_ = false;												//Is card present
+		bool card_changed_ = false;												//Has card changed
+		uint8_t rfid_read_failures_ = 0;										//Count up before considering a card removed
+		uint8_t rfid_read_failure_threshold_ = 2;								//Threshold to hit for card removal
+		uint32_t rfid_reader_last_polled_ = 0;									//Timer for regular polling of RFID
+		uint32_t rfid_reader_polling_interval_ = 100;							//Timer for regular polling of RFID
+		bool PollForCard_();													//Poll to check if a card is there
 		//Reset detection
 		DoubleResetDetector reset_detector;										//Double reset detector
 		//Wi-Fi

@@ -12,14 +12,12 @@
 #include "LarpHackableRfidLock.h"
 
 
-LarpHackableRfidLock::LarpHackableRfidLock()	//Constructor function
-  : MIFARE_device(D8, D3),						//Calls constructor of class MFRC522, CS D8, RST D3
-  reset_detector(DRD_TIMEOUT, DRD_ADDRESS)		//Calls constructor of class DoubleResetDetector
+LarpHackableRfidLock::LarpHackableRfidLock()	:	//Constructor function and member constructors
+	rfid_ss_pin_(D8),
+	rfid_driver_{rfid_ss_pin_},
+	rfid_reader_{rfid_driver_},
+	reset_detector(DRD_TIMEOUT, DRD_ADDRESS)	//Calls constructor of class DoubleResetDetector
 {
-	//Use the default key from the factory: FFFFFFFFFFFF (hex) 
-	for (int i = 0; i < 6; i ++) {
-		this->card_key.keyByte[i] = 0xFF;
-	}
 }
 
 LarpHackableRfidLock::~LarpHackableRfidLock()	//Destructor function
@@ -53,8 +51,19 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::begin()	{
 	{
 		lock_uart->println(F("Starting normally"));
 	}
-	SPI.begin();
-	this->MIFARE_device.PCD_Init();
+	//Initialise RFID reader
+	rfid_reader_.PCD_Init();
+	if(lock_uart != nullptr)
+	{
+		lock_uart->println(F("Initialising RFID reader"));
+		lock_uart->print(F("MFRC522 Self test: "));
+		if (rfid_reader_.PCD_PerformSelfTest() == true)	{
+			lock_uart->println(F("OK"));
+		}
+		else	{
+			lock_uart->println(F("Fail"));
+		}
+	}
 }
 
 void ICACHE_FLASH_ATTR LarpHackableRfidLock::RedLedOn()	{
@@ -101,9 +110,10 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::GreenLedOff()	{
 		}
 	}
 }
-void ICACHE_FLASH_ATTR LarpHackableRfidLock::BuzzerOn(uint16_t frequency)	{
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::BuzzerOn(uint16_t frequency, uint32_t on_time)	{
 	if(buzzer_state_ == false)	{
-		tone(buzzer_pin_, frequency, max_buzzer_on_time_);
+		buzzer_on_time_ = on_time;
+		tone(buzzer_pin_, frequency, on_time);
 		if(lock_uart != nullptr)
 		{
 			lock_uart->println(F("Lock buzzer on"));
@@ -123,62 +133,134 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::BuzzerOff()	{
 		}
 	}
 }
-bool ICACHE_FLASH_ATTR LarpHackableRfidLock::CardPresented() {
-	if(this->MIFARE_device.PICC_IsNewCardPresent() == false) {
-		return(false);
-	}
-	if(this->MIFARE_device.PICC_ReadCardSerial() == false) {
-		if(card_present == true)
+bool ICACHE_FLASH_ATTR LarpHackableRfidLock::enableRFID() {
+	return(true);
+}
+uint8_t* ICACHE_FLASH_ATTR LarpHackableRfidLock::CardUID() {
+	return(current_uid_);
+}
+uint8_t ICACHE_FLASH_ATTR LarpHackableRfidLock::CardUIDsize() {
+	return(current_uid_size_);
+}
+
+bool ICACHE_FLASH_ATTR LarpHackableRfidLock::PollForCard_() {
+	if(millis() - rfid_reader_last_polled_ > rfid_reader_polling_interval_)
+	{
+		rfid_reader_last_polled_ = millis();
+		/*if(lock_uart != nullptr)
 		{
-			current_nuid[0] = 0;
-			current_nuid[1] = 0;
-			current_nuid[2] = 0;
-			current_nuid[3] = 0;
-			card_present = false;
-			if(lock_uart != nullptr)
+			lock_uart->print(F("Polling card:"));
+		}*/
+		if(rfid_reader_.PICC_IsNewCardPresent() == false) {
+			if(rfid_read_failures_++ >= rfid_read_failure_threshold_)
 			{
-				lock_uart->print(F("Card removed"));
+				rfid_read_failures_ = rfid_read_failure_threshold_;
+				if(card_present_ == true) {
+					if(lock_uart != nullptr)
+					{
+						lock_uart->println(F("Card removed"));
+					}
+					for(uint8_t i = 0; i < current_uid_size_; i++) {
+						current_uid_[i] = 0;
+					}
+					current_uid_size_ = 0;
+					card_present_ = false;
+				}
+				return(false);
+			}
+			/*if(lock_uart != nullptr)
+			{
+				lock_uart->println(F("not present"));
+			}*/
+			return(false);
+		}
+		if(rfid_reader_.PICC_ReadCardSerial() == false) {
+			if(rfid_read_failures_++ >= rfid_read_failure_threshold_)
+			{
+				rfid_read_failures_ = rfid_read_failure_threshold_;
+				if(card_present_ == true) {
+					if(lock_uart != nullptr)
+					{
+						lock_uart->println(F("Card removed"));
+					}
+					for(uint8_t i = 0; i < current_uid_size_; i++) {
+						current_uid_[i] = 0;
+					}
+					current_uid_size_ = 0;
+					card_present_ = false;
+				}
+				return(false);
+			}
+			/*if(lock_uart != nullptr)
+			{
+				lock_uart->println(F("can't read PICC"));
+			}*/
+			return(false);
+		}
+		/*if(lock_uart != nullptr)
+		{
+			lock_uart->println(F("present"));
+		}*/
+		card_present_ = true;
+		card_changed_ = false;
+		rfid_read_failures_ = 0;
+		if(current_uid_size_ != rfid_reader_.uid.size)
+		{
+			current_uid_size_ = rfid_reader_.uid.size;
+			card_changed_ = true;
+		}
+		for(uint8_t i = 0; i < rfid_reader_.uid.size; i++) {
+			if(current_uid_[i] != rfid_reader_.uid.uidByte[i])
+			{
+				current_uid_[i] = rfid_reader_.uid.uidByte[i];
+				card_changed_ = true;
 			}
 		}
-		return(false);
-	}
-	MFRC522::PICC_Type piccType = this->MIFARE_device.PICC_GetType(this->MIFARE_device.uid.sak);
-	if(lock_uart != nullptr && card_present == false)
-	{
-		lock_uart->print(F("PICC type: "));
-		lock_uart->print(this->MIFARE_device.PICC_GetTypeName(piccType));
-	}
-	if (piccType != MFRC522::PICC_TYPE_MIFARE_MINI &&  
-    piccType != MFRC522::PICC_TYPE_MIFARE_1K &&
-    piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
-		if(lock_uart != nullptr)
-		{
-			lock_uart->println(F(" tag is not of type MIFARE Classic."));
-		}
-		card_present = false;
-		return(false);
-	}
-	else if(lock_uart != nullptr && card_present == false)
-	{
-		lock_uart->println();
-	}
-	card_present = true;
-	if(current_nuid[0] != MIFARE_device.uid.uidByte[0] ||
-		current_nuid[1] != MIFARE_device.uid.uidByte[1] ||
-		current_nuid[2] != MIFARE_device.uid.uidByte[2] ||
-		current_nuid[3] != MIFARE_device.uid.uidByte[3]) {
-		for (uint8_t i = 0; i < 4; i++) {
-		  current_nuid[i] = this->MIFARE_device.uid.uidByte[i];
-		}
-		if(lock_uart != nullptr)
-		{
-			lock_uart->printf("New card NUID:%02x:%02x:%02x:%02x\r\n",current_nuid[0],current_nuid[1],current_nuid[2],current_nuid[3]);
+		if(card_present_ == true && lock_uart != nullptr)	{
+			if(card_changed_)	{
+				lock_uart->print(F("New card presented "));
+			} else {
+				lock_uart->print(F("Card present "));
+			}
+			switch (current_uid_size_) {
+			case 4:
+				lock_uart->printf("UID:%02x:%02x:%02x:%02x\r\n",current_uid_[0],current_uid_[1],current_uid_[2],current_uid_[3]);
+			break;
+			case 7:
+				lock_uart->printf("UID:%02x:%02x:%02x:%02x:%02x:%02x:%02x\r\n",current_uid_[0],current_uid_[1],current_uid_[2],current_uid_[3],current_uid_[4],current_uid_[5],current_uid_[6]);
+			break;
+			case 10:
+				lock_uart->printf("UID:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\r\n",current_uid_[0],current_uid_[1],current_uid_[2],current_uid_[3],current_uid_[4],current_uid_[5],current_uid_[6],current_uid_[7],current_uid_[8],current_uid_[9]);
+			break;
+			default:
+			break;
+			}		
+			
 		}
 		return(true);
 	}
 	return(false);
 }
-
+bool ICACHE_FLASH_ATTR LarpHackableRfidLock::CardChanged() {
+	if(card_changed_)
+	{
+		card_changed_ = false;
+		return(true);
+	}
+	return(false);
+}
+bool ICACHE_FLASH_ATTR LarpHackableRfidLock::CardPresent() {
+	return(card_present_);
+}
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::enableTapCode() {
+	
+	tapCode_ = new TapCode(RX);	//Initialise tap code on pin 2
+	if(lock_uart != nullptr)
+	{
+		tapCode_->debug(Serial); //Enable debugging
+	}
+	tapCode_->begin();
+}
 bool ICACHE_FLASH_ATTR LarpHackableRfidLock::Reset() {
 	if(this->reset_detector.detectDoubleReset() == true)	{
 		return(true);
@@ -188,6 +270,16 @@ bool ICACHE_FLASH_ATTR LarpHackableRfidLock::Reset() {
 
 void  ICACHE_FLASH_ATTR LarpHackableRfidLock::Housekeeping(){
 	this->reset_detector.loop();
+	if(buzzer_state_ == true && millis() - buzzer_state_last_changed_ > buzzer_on_time_)	//Track how long the buzzer was on for
+	{
+		buzzer_state_last_changed_ = millis();
+		buzzer_state_ = false;
+	}
+	PollForCard_();
+	if(tapCode_ != nullptr)	//Only run the tap code sections if enabled
+	{
+		tapCode_->read();
+	}
 }
 
 void ICACHE_FLASH_ATTR LarpHackableRfidLock::Debug(Stream &terminalStream)
