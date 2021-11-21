@@ -14,11 +14,22 @@ GreenLedOn	KEYWORD2
 GreenLedOff	KEYWORD2
 BuzzerOn	KEYWORD2
 BuzzerOff	KEYWORD2
+allow	KEYWORD2
+deny	KEYWORD2
+lock	KEYWORD2
+unlock	KEYWORD2
 
 //RFID
 enableRFID	KEYWORD2
 CardPresent	KEYWORD2
 CardChanged	KEYWORD2
+CardAuthorised	KEYWORD2
+WipeCard	KEYWORD2
+AllowCard	KEYWORD2
+DenyCard	KEYWORD2
 
 //Tap code related
 enableTapCode	KEYWORD2
+codeEntered	KEYWORD2
+codeMatches	KEYWORD2
+clearEnteredCode	KEYWORD2
