@@ -24,7 +24,8 @@ LarpHackableRfidLock::~LarpHackableRfidLock()	//Destructor function
 {
 }
 
-void ICACHE_FLASH_ATTR LarpHackableRfidLock::begin()	{
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::begin(uint8_t id)	{
+	accessId = id;
 	pinMode(red_led_pin_,OUTPUT);
 	digitalWrite(red_led_pin_,red_led_pin_off_value_);
 	pinMode(green_led_pin_,OUTPUT);
@@ -45,7 +46,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::begin()	{
 			lock_uart->print(F(" PSK:"));
 			lock_uart->println(default_psk);
 		}
-		tone(buzzer_pin_, musicalTones[0], 500);
+		tone(buzzer_pin_, musicalTone[0], 500);
 	}
 	else if(lock_uart != nullptr)
 	{
@@ -64,16 +65,24 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::begin()	{
 			lock_uart->println(F("Fail"));
 		}
 	}
+	for (uint8_t i = 0; i < MFRC522::MIFARE_Misc::MF_KEY_SIZE; i++) {
+		key_.keyByte[i] = 0xFF;
+	}
 }
 
-void ICACHE_FLASH_ATTR LarpHackableRfidLock::RedLedOn()	{
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::RedLedOn(uint32_t on_time)	{
 	if(red_led_state_ == false)	{
 		digitalWrite(red_led_pin_,red_led_pin_on_value_);
 		red_led_state_ = true;
 		red_led_state_last_changed_ = millis();
+		red_led_on_time_= on_time;
 		if(lock_uart != nullptr)
 		{
-			lock_uart->println(F("Lock red LED on"));
+			if(on_time == 0) {
+				lock_uart->println(F("Lock red LED on"));
+			} else {
+				lock_uart->printf("Lock red LED on for %ums\r\n", on_time);
+			}
 		}
 	}
 }
@@ -88,14 +97,19 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::RedLedOff()	{
 		}
 	}
 }
-void ICACHE_FLASH_ATTR LarpHackableRfidLock::GreenLedOn()	{
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::GreenLedOn(uint32_t on_time)	{
 	if(green_led_state_ == false)	{
 		digitalWrite(green_led_pin_,green_led_pin_on_value_);
 		green_led_state_ = true;
 		green_led_state_last_changed_ = millis();
+		green_led_on_time_= on_time;
 		if(lock_uart != nullptr)
 		{
-			lock_uart->println(F("Lock green LED on"));
+			if(on_time == 0) {
+				lock_uart->println(F("Lock green LED on"));
+			} else {
+				lock_uart->printf("Lock green LED on for %ums\r\n", on_time);
+			}
 		}
 	}
 }
@@ -116,7 +130,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::BuzzerOn(uint16_t frequency, uint32
 		tone(buzzer_pin_, frequency, on_time);
 		if(lock_uart != nullptr)
 		{
-			lock_uart->println(F("Lock buzzer on"));
+			lock_uart->printf("Lock buzzer on %uhz for %ums\r\n",frequency,on_time);
 		}
 		buzzer_state_last_changed_ = millis();
 		buzzer_state_ = true;
@@ -132,6 +146,26 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::BuzzerOff()	{
 			lock_uart->println(F("Lock buzzer off"));
 		}
 	}
+}
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::allow()	{
+	BuzzerOn(musicalTone[4], 250);
+	GreenLedOn(5000);
+	RedLedOff();
+}
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::deny()	{
+	BuzzerOn(musicalTone[7], 500);
+	RedLedOn(5000);
+	GreenLedOff();
+}
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::unlock()	{
+	BuzzerOn(musicalTone[4], 250);
+	GreenLedOn();
+	RedLedOff();
+}
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::lock()	{
+	BuzzerOn(musicalTone[7], 500);
+	RedLedOn();
+	GreenLedOff();
 }
 bool ICACHE_FLASH_ATTR LarpHackableRfidLock::enableRFID() {
 	return(true);
@@ -237,9 +271,266 @@ bool ICACHE_FLASH_ATTR LarpHackableRfidLock::PollForCard_() {
 			}		
 			
 		}
+		/*if(card_changed_)
+		{
+			ReadCardFlags_();
+			WipeCard();
+			for(uint8_t i = 0; i<32 ; i++)
+			{
+				card_flags_[i] = random(0,255);
+			}
+			WriteCardFlags_();
+		}*/
 		return(true);
 	}
 	return(false);
+}
+
+bool ICACHE_FLASH_ATTR LarpHackableRfidLock::WipeCard() {
+	for(uint8_t i = 0; i < 32 ; i++)
+	{
+		card_flags_[0] = 0;
+	}
+	if(AuthenticateWithCard_() == false)
+	{
+		return(false);
+	}
+	if(WriteCardFlags_() == false)
+	{
+		return(false);
+	}
+	DeAuthenticateWithCard_();
+	return(true);
+}
+
+bool ICACHE_FLASH_ATTR LarpHackableRfidLock::AllowCard(uint8_t id) {
+	if(AuthenticateWithCard_() == false)
+	{
+		return(false);
+	}
+	if(ReadCardFlags_() == false)
+	{
+		return(false);
+	}
+	card_flags_[id>>8] = card_flags_[id>>8] | 0x01<<(id%8);	//Set the specific bit
+	if(WriteCardFlags_() == false)
+	{
+		return(false);
+	}
+	DeAuthenticateWithCard_();
+	return(true);
+}
+bool ICACHE_FLASH_ATTR LarpHackableRfidLock::DenyCard(uint8_t id) {
+	if(AuthenticateWithCard_() == false)
+	{
+		return(false);
+	}
+	if(ReadCardFlags_() == false)
+	{
+		return(false);
+	}
+	card_flags_[id>>8] = card_flags_[id>>8] ^ 0xFE<<(id%8);	//Unset the specific bit
+	if(WriteCardFlags_() == false)
+	{
+		return(false);
+	}
+	DeAuthenticateWithCard_();
+	return(true);
+}
+
+bool ICACHE_FLASH_ATTR LarpHackableRfidLock::CardAuthorised(uint8_t id) {
+	if(AuthenticateWithCard_() == false)
+	{
+		return(false);
+	}
+	if(ReadCardFlags_() == false)
+	{
+		return(false);
+	}
+	DeAuthenticateWithCard_();
+	if(card_flags_[id>>8] & 0x01<<(id%8))	//Check the specific bit
+	{
+		return(true);
+	}
+	else
+	{
+		return(false);
+	}
+}
+
+bool ICACHE_FLASH_ATTR LarpHackableRfidLock::AuthenticateWithCard_() {
+	MFRC522::StatusCode status = (MFRC522::StatusCode) rfid_reader_.PCD_Authenticate(MFRC522Constants::PICC_Command::PICC_CMD_MF_AUTH_KEY_A, trailerBlock_, &key_, &(rfid_reader_.uid));
+	if (status != MFRC522::StatusCode::STATUS_OK) {
+		if(lock_uart != nullptr)
+		{
+			lock_uart->print(F("PCD_Authenticate() failed: "));
+			lock_uart->println(MFRC522Debug::GetStatusCodeName(status));
+		}
+		return(false);
+	}
+	return(true);
+}
+
+bool ICACHE_FLASH_ATTR LarpHackableRfidLock::ReadCardFlags_() {
+	if(lock_uart != nullptr) {
+		lock_uart->println(F("Authenticating PICC using key A to read card data..."));
+	}
+	MFRC522::MIFARE_Key key_;
+	for (uint8_t i = 0; i < MFRC522::MIFARE_Misc::MF_KEY_SIZE; i++) {
+		key_.keyByte[i] = 0xFF;
+	}
+	uint8_t buffer[18] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; //Needs two bytes for the CRC
+	uint8_t size = sizeof(buffer);
+	if(lock_uart != nullptr)
+	{
+		MFRC522Debug::PICC_DumpMifareClassicSectorToSerial(rfid_reader_, Serial, &(rfid_reader_.uid), &key_, flags_start_sector_);
+		lock_uart->println();
+		lock_uart->printf("MIFARE_Read() sector %u block %u start: ",flags_start_sector_, flags_start_block_);
+	}
+	MFRC522::StatusCode status = (MFRC522::StatusCode) rfid_reader_.MIFARE_Read(flags_start_block_, buffer, &size);
+	if (status != MFRC522::StatusCode::STATUS_OK) {
+		if(lock_uart != nullptr)
+		{
+			lock_uart->print(F("failed: "));
+			lock_uart->println(MFRC522Debug::GetStatusCodeName(status));
+		}
+		rfid_reader_.PICC_HaltA();
+		rfid_reader_.PCD_StopCrypto1();
+		return(false);
+	}
+	if(lock_uart != nullptr)
+	{
+		lock_uart->print(F("success: "));
+	}
+	for (uint8_t i = 0; i < 16; i++) {
+		card_flags_[i] = buffer[i];
+		if(lock_uart != nullptr)
+		{
+			lock_uart->printf("%02x",buffer[i]);
+			if(i<15)
+			{
+				lock_uart->print(':');
+			}
+			else
+			{
+				lock_uart->println();
+			}
+		}
+	}
+	if(lock_uart != nullptr)
+	{
+		lock_uart->printf("MIFARE_Read() sector %u block %u start: ",flags_start_sector_, flags_start_block_+1);
+	}
+	status = (MFRC522::StatusCode) rfid_reader_.MIFARE_Read(flags_start_block_+1, buffer, &size);
+	if (status != MFRC522::StatusCode::STATUS_OK) {
+		if(lock_uart != nullptr)
+		{
+			lock_uart->print(F("failed: "));
+			lock_uart->println(MFRC522Debug::GetStatusCodeName(status));
+		}
+		rfid_reader_.PICC_HaltA();
+		rfid_reader_.PCD_StopCrypto1();
+		return(false);
+	}
+	if(lock_uart != nullptr)
+	{
+		lock_uart->print(F("success: "));
+	}
+	for (uint8_t i = 0; i < 16; i++) {
+		card_flags_[i + 16] = buffer[i];
+		if(lock_uart != nullptr)
+		{
+			lock_uart->printf("%02x",buffer[i]);
+			if(i<15)
+			{
+				lock_uart->print(':');
+			}
+			else
+			{
+				lock_uart->println();
+			}
+		}
+	}
+	return(true);
+}
+
+bool ICACHE_FLASH_ATTR LarpHackableRfidLock::WriteCardFlags_() {
+	if(lock_uart != nullptr)
+	{
+		MFRC522Debug::PICC_DumpMifareClassicSectorToSerial(rfid_reader_, Serial, &(rfid_reader_.uid), &key_, flags_start_sector_);
+		lock_uart->println();
+		lock_uart->printf("MIFARE_Write() sector %u block %u start: ",flags_start_sector_, flags_start_block_);
+	}
+	MFRC522::StatusCode status = (MFRC522::StatusCode) rfid_reader_.MIFARE_Write(flags_start_block_, &card_flags_[0], 16);
+	if (status != MFRC522::StatusCode::STATUS_OK) {
+		if(lock_uart != nullptr)
+		{
+			lock_uart->print(F("failed: "));
+			lock_uart->println(MFRC522Debug::GetStatusCodeName(status));
+		}
+		rfid_reader_.PICC_HaltA();
+		rfid_reader_.PCD_StopCrypto1();
+		return(false);
+	}
+	if(lock_uart != nullptr)
+	{
+		lock_uart->print(F("success: "));
+	}
+	for (uint8_t i = 0; i < 16; i++) {
+		if(lock_uart != nullptr)
+		{
+			lock_uart->printf("%02x",card_flags_[i]);
+			if(i<15)
+			{
+				lock_uart->print(':');
+			}
+			else
+			{
+				lock_uart->println();
+			}
+		}
+	}
+	if(lock_uart != nullptr)
+	{
+		lock_uart->printf("MIFARE_Write() sector %u block %u start: ",flags_start_sector_, flags_start_block_+1);
+	}
+	status = (MFRC522::StatusCode) rfid_reader_.MIFARE_Write(flags_start_block_+1, &card_flags_[16], 16);
+	if (status != MFRC522::StatusCode::STATUS_OK) {
+		if(lock_uart != nullptr)
+		{
+			lock_uart->print(F("failed: "));
+			lock_uart->println(MFRC522Debug::GetStatusCodeName(status));
+		}
+		rfid_reader_.PICC_HaltA();
+		rfid_reader_.PCD_StopCrypto1();
+		return(false);
+	}
+	if(lock_uart != nullptr)
+	{
+		lock_uart->print(F("success: "));
+	}
+	for (uint8_t i = 0; i < 16; i++) {
+		if(lock_uart != nullptr)
+		{
+			lock_uart->printf("%02x",card_flags_[i + 16]);
+			if(i<15)
+			{
+				lock_uart->print(':');
+			}
+			else
+			{
+				lock_uart->println();
+			}
+		}
+	}
+	MFRC522Debug::PICC_DumpMifareClassicSectorToSerial(rfid_reader_, Serial, &(rfid_reader_.uid), &key_, flags_start_sector_);
+	return(true);
+}
+
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::DeAuthenticateWithCard_()
+{
+	rfid_reader_.PICC_HaltA();
+	rfid_reader_.PCD_StopCrypto1();
 }
 bool ICACHE_FLASH_ATTR LarpHackableRfidLock::CardChanged() {
 	if(card_changed_)
@@ -261,6 +552,26 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::enableTapCode() {
 	}
 	tapCode_->begin();
 }
+bool ICACHE_FLASH_ATTR LarpHackableRfidLock::codeEntered() {
+	if(tapCode_ != nullptr)
+	{
+		return(tapCode_->finished());
+	}
+	return(false);
+}
+bool ICACHE_FLASH_ATTR LarpHackableRfidLock::codeMatches(char* code) {
+	if(tapCode_ != nullptr)
+	{
+		return(tapCode_->matches(code));
+	}
+	return(false);
+}
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::clearEnteredCode() {
+	if(tapCode_ != nullptr)
+	{
+		tapCode_->reset();
+	}
+}
 bool ICACHE_FLASH_ATTR LarpHackableRfidLock::Reset() {
 	if(this->reset_detector.detectDoubleReset() == true)	{
 		return(true);
@@ -270,6 +581,20 @@ bool ICACHE_FLASH_ATTR LarpHackableRfidLock::Reset() {
 
 void  ICACHE_FLASH_ATTR LarpHackableRfidLock::Housekeeping(){
 	this->reset_detector.loop();
+	if(red_led_state_ == true && red_led_on_time_ > 0 && millis() - red_led_state_last_changed_ > red_led_on_time_)	//Switch off the red LED after red_led_on_time_
+	{
+		digitalWrite(red_led_pin_,red_led_pin_off_value_);
+		red_led_state_last_changed_ = millis();
+		red_led_on_time_ = 0;
+		red_led_state_ = false;
+	}
+	if(green_led_state_ == true && green_led_on_time_ > 0 && millis() - green_led_state_last_changed_ > green_led_on_time_)	//Switch off the red LED after green_led_on_time_
+	{
+		digitalWrite(green_led_pin_,green_led_pin_off_value_);
+		green_led_state_last_changed_ = millis();
+		green_led_on_time_ = 0;
+		green_led_state_ = false;
+	}
 	if(buzzer_state_ == true && millis() - buzzer_state_last_changed_ > buzzer_on_time_)	//Track how long the buzzer was on for
 	{
 		buzzer_state_last_changed_ = millis();
