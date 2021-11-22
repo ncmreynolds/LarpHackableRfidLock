@@ -8,12 +8,12 @@ Reset	KEYWORD2
 Debug	KEYWORD2
 
 //Indicators
-RedLedOn	KEYWORD2
-RedLedOff	KEYWORD2
-GreenLedOn	KEYWORD2
-GreenLedOff	KEYWORD2
-BuzzerOn	KEYWORD2
-BuzzerOff	KEYWORD2
+redLedOn	KEYWORD2
+redLedOff	KEYWORD2
+greenLedOn	KEYWORD2
+greenLedOff	KEYWORD2
+buzzerOn	KEYWORD2
+buzzerOff	KEYWORD2
 allow	KEYWORD2
 deny	KEYWORD2
 lock	KEYWORD2
@@ -21,12 +21,12 @@ unlock	KEYWORD2
 
 //RFID
 enableRFID	KEYWORD2
-CardPresent	KEYWORD2
-CardChanged	KEYWORD2
-CardAuthorised	KEYWORD2
-WipeCard	KEYWORD2
-AllowCard	KEYWORD2
-DenyCard	KEYWORD2
+cardPresent	KEYWORD2
+cardChanged	KEYWORD2
+cardAuthorised	KEYWORD2
+wipeCard	KEYWORD2
+authoriseCard	KEYWORD2
+revokeCard	KEYWORD2
 
 //Tap code related
 enableTapCode	KEYWORD2

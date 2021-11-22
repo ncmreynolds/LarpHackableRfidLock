@@ -11,12 +11,7 @@
 #define LarpHackableRfidLock_h
 #include <Arduino.h>
 //RFID reader
-//#include <SPI.h>
-//#include <MFRC522.h>
-#include <MFRC522v2.h>
-#include <MFRC522DriverSPI.h>
-#include <MFRC522DriverPinSimple.h>
-#include <MFRC522Debug.h>
+#include <TrivialRFIDauthorisation.h>
 //Double reset detection
 #ifdef ESP8266
 	#define ESP8266_DRD_USE_RTC     false   //true
@@ -37,16 +32,16 @@ class LarpHackableRfidLock	{
 		LarpHackableRfidLock();													//Constructor function
 		~LarpHackableRfidLock();												//Destructor function
 		void begin(uint8_t id = 0);												//Start the lock and configure all the peripherals
-		void Housekeeping();													//Do housekeeping for event/state changes
-		void RedLedOn(uint32_t on_time = 0);									//Switch on red LED. On time is 0 for permanent or otherwise in ms.
-		void RedLedOff();														//Switch off red LED
-		void GreenLedOn(uint32_t on_time = 0);									//Switch on green LED. On time is 0 for permanent or otherwise in ms.
-		void GreenLedOff();														//Switch off green LED
-		void BuzzerOn(uint16_t frequency = 440, uint32_t on_time = 100);		//Switch on buzzer, with a selected frequency and on time
-		void BuzzerOff();														//Switch off buzzer
+		void housekeeping();													//Do housekeeping for event/state changes
+		void redLedOn(uint32_t on_time = 0);									//Switch on red LED. On time is 0 for permanent or otherwise in ms.
+		void redLedOff();														//Switch off red LED
+		void greenLedOn(uint32_t on_time = 0);									//Switch on green LED. On time is 0 for permanent or otherwise in ms.
+		void greenLedOff();														//Switch off green LED
+		void buzzerOn(uint16_t frequency = 440, uint32_t on_time = 100);		//Switch on buzzer, with a selected frequency and on time
+		void buzzerOff();														//Switch off buzzer
 		//void open();															//Change to open state
-		bool Reset();															//Has the lock been reset
-		void Debug(Stream &);													//Enable debug output on a Serial stream
+		bool doubleReset();															//Has the lock been reset
+		void debug(Stream &);													//Enable debug output on a Serial stream
 		//Higher level lock control
 		enum class lockEvent : uint8_t {open, unlock, lock, sleep};
 		void allow();															//Unlocks briefly to allow the door to open and people to pass
@@ -55,35 +50,23 @@ class LarpHackableRfidLock	{
 		void lock();															//Lock, preventing the door from opening even with normally valid access
 		void sleep(uint32_t);													//Deep sleep for an amount of time
 		//RFID
-		bool enableRFID();														//Enable RFID reading
-		bool CardPresent();														//Is a card just present?
-		bool CardChanged();														//Has it changed?
-		bool CardAuthorised(uint8_t);											//Is this card authorised for this ID?
-		bool WipeCard();														//Wipe the flags from a card, setting them all to zero
-		bool AllowCard(uint8_t);												//Allow this card
-		bool DenyCard(uint8_t);													//Deny this card
-		uint8_t* CardUID();														//Retrieve a pointer to the current UID
-		uint8_t CardUIDsize();													//Size of the current UID
-		//Card database
-		//bool initialiseCardDatabase(uint8_t size = 64);							//Initialises the card database
-		//bool eraseCardDatabase();												//Erases the card database
-		//bool loadCardDatabase();												//Loads the card database from storage
-		//bool saveCardDatabase(bool force = false);								//Saves the card database to storage if changed (or forced)
-		//bool cardRegistered(uint8_t* id);										//Returns true if the card is registered in the database
-		//bool addCard(uint8_t* id);												//Add a card to the database
-		//bool removeCard(uint8_t* id);											//Remove a card from the database
-		//bool authoriseCard(uint8_t* id);										//Authorise a card for this lock
-		//bool revokeCard(uint8_t* id);											//Revoke the authorisation for a card for this lock
+		void enableRFID(uint8_t pin);											//Enable RFID reading with SS on a pin (default sector 0)
+		bool authoriseCard(uint8_t);											//Allow this card
+		bool revokeCard(uint8_t);												//Deny this card
+		bool wipeCard();														//Wipe the flags from a card, setting them all to zero
+		bool cardPresent();														//Is a card just present?
+		bool cardChanged();														//Has it changed?
+		bool cardAuthorised(uint8_t);											//Is this card authorised for this ID?
 		//Tap code
-		void enableTapCode();													//Enables the use of tap code on the lock
+		void enableTapCode(uint8_t);											//Enables the use of tap code on the lock
 		bool codeEntered();														//Has a code been entered?
 		bool codeMatches(char*);												//Does the code match
 		void clearEnteredCode();												//Reset the entered code
 		bool setTapCode(char*, uint8_t);										//Set the tap code for an action
 	protected:
 	private:
-		Stream *lock_uart = nullptr;											//The stream used for the terminal UART
-		uint8_t accessId = 0;															//ID used for access
+		Stream *lock_uart = nullptr;											//The stream used for debugging
+		uint8_t accessId = 0;													//ID used for access
 		uint8_t red_led_pin_ = D2;												//GPIO pin used for the red LED
 		uint8_t red_led_pin_on_value_ = HIGH;									//GPIO pin used for the red LED
 		uint8_t red_led_pin_off_value_ = LOW;									//GPIO pin used for the red LED
@@ -102,33 +85,10 @@ class LarpHackableRfidLock	{
 		uint32_t buzzer_on_time_ = 0;
 		uint32_t max_buzzer_on_time_ = 60000;									//Maximum buzzer on time, to avoid total irritation
 		//RFID related
-		MFRC522DriverPinSimple rfid_ss_pin_;
-		MFRC522DriverSPI rfid_driver_;
-		MFRC522 rfid_reader_;
-		MFRC522::MIFARE_Key key_;
-		bool rfid_antenna_enabled_ = true;										//Tracks state of the RFID antenna
-		uint8_t current_uid_[10];												//UID of last presented card
-		uint8_t current_uid_size_ = 4;											//UID size will be 4, 7 or 10
-		bool card_present_ = false;												//Is card present
-		bool card_changed_ = false;												//Has card changed
-		uint8_t rfid_read_failures_ = 0;										//Count up before considering a card removed
-		uint8_t rfid_read_failure_threshold_ = 2;								//Threshold to hit for card removal
-		uint32_t rfid_reader_last_polled_ = 0;									//Timer for regular polling of RFID
-		uint32_t rfid_reader_polling_interval_ = 100;							//Timer for regular polling of RFID
-		uint8_t card_flags_[32];												//Take a copy of the flags on the card
-		uint8_t flags_start_block_ = 4;											//Block to start flags from
-		uint8_t flags_start_sector_ = 1;										//Sector to start flags from
-		uint8_t trailerBlock_  = 7;
-
-		bool PollForCard_();													//Poll to check if a card is there
-		bool AuthenticateWithCard_();
-		bool ReadCardFlags_();													//Read the flags from a card
-		bool WriteCardFlags_();													//Write the flags to a card
-		void DeAuthenticateWithCard_();											//Deauthenticate after a transaction is done
-		//bool ReadBlock_(uint8_t, uint8_t, uint8_t*);							//Write a block
-		//bool WriteBlock_(uint8_t, uint8_t, uint8_t*);							//Read a block
+		TrivialRFIDauthorisation* rfid_ = nullptr;								//Pointer to the RFID wrapper class
+		uint8_t rfid_authorisation_sector_ = 0;									//Sector where the RFID authorisation block is stored
 		//Reset detection
-		DoubleResetDetector reset_detector;										//Double reset detector
+		DoubleResetDetector reset_detector_;									//Double reset detector
 		//Wi-Fi
 		const char default_ssid[5] = "Lock";									//Default SSID when configuring lock
 		const char default_psk[8] = "LetMeIn";									//Default PSK when configuring lock

@@ -28,14 +28,14 @@ uint8_t rfidReaderState = RFID_READER_NORMAL;
 
 void setup() {
   Serial.begin(115200, SERIAL_8N1, SERIAL_TX_ONLY); //Note SERIAL_TX_ONLY allows use of RX for a button
-  Lock.Debug(Serial);
+  Lock.debug(Serial);
   Lock.begin(accessId); //Start the lock with a specific access Id
-  Lock.enableTapCode();  //Enable tap code
-  Lock.enableRFID();  //Enable RFID reader
+  Lock.enableTapCode(RX);  //Enable tap code on RX pin
+  Lock.enableRFID(D8);  //Enable RFID reader authorisation, CS on pin D8, using default card sector
 }
 
 void loop() {
-  Lock.Housekeeping();
+  Lock.housekeeping();
   if(Lock.codeEntered()) {  //A code has been tapped out
     if(Lock.codeMatches(codeToOpen)) {  //Code matches the 'open' one
       Lock.allow();
@@ -59,42 +59,44 @@ void loop() {
     }
     Lock.clearEnteredCode();  //Clear the entered code, otherwise it will keep repeating these checks
   }
-  if(Lock.CardPresent() && Lock.CardChanged())
+  if(Lock.cardPresent() && Lock.cardChanged())
   {
     if(rfidReaderState == RFID_READER_NORMAL)
     {
-      if(Lock.CardAuthorised(accessId) == true)
+      if(Lock.cardAuthorised(accessId) == true)
       {
         Lock.allow();
+        Serial.println(F("Card authorised"));
       }
       else
       {
+        Lock.deny();
         Serial.println(F("Card not authorised"));
       }
     }
     else if(rfidReaderState == RFID_READER_WIPE_NEXT_CARD)
     {
-      if(Lock.WipeCard())
+      if(Lock.wipeCard())
       {
-        Lock.BuzzerOn(110,500);
+        Lock.buzzerOn(110,500);
         Serial.println(F("Card wiped"));
         rfidReaderState = RFID_READER_NORMAL;
       }
     }
     else if(rfidReaderState == RFID_READER_ALLOW_NEXT_CARD)
     {
-      if(Lock.AllowCard(accessId))
+      if(Lock.authoriseCard(accessId))
       {
-        Lock.BuzzerOn(110,500);
+        Lock.buzzerOn(110,500);
         Serial.println(F("Card allowed"));
         rfidReaderState = RFID_READER_NORMAL;
       }
     }
     else if(rfidReaderState == RFID_READER_DENY_NEXT_CARD)
     {
-      if(Lock.DenyCard(accessId))
+      if(Lock.revokeCard(accessId))
       {
-        Lock.BuzzerOn(110,500);
+        Lock.buzzerOn(110,500);
         Serial.println(F("Card denied"));
         rfidReaderState = RFID_READER_NORMAL;
       }
