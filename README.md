@@ -6,9 +6,9 @@ Code, circuits and 3D printable enclosures for a 'hackable' RFID lock prop usabl
 - Cheap! You need one per door, LARPs often have lots of doors.
 - Ubiquitous hobbyist hardware, nothing custom/rare
 - Easy to build and solder
-- Reads easily and cheaply available MIFARE Classic RFID cards
-- Clear visual and audible feedback when presenting a card
-- Multiple software options (local card database, MQTT server etc.) for validating cards
+- Reads easily and cheaply available MIFARE Classic RFID cards.
+- Clear visual and audible feedback when presenting a card. Two LEDs and a piezo buzzer are the current candidates rather than a display.
+- Multiple software options (local card database, on-card authorisation, MQTT server etc.) for validating cards **An [authorisation library](https://github.com/ncmreynolds/TrivialRFIDauthorisation) that use a bitmask on the card these has now been written.**
 - Multiple 'hacking' options by physical interaction or smartphone/tablet connection
 - Easy to reset to defaults before/during/after events, no reprogramming/rebuilding. **Have settled on '[double reset detector](https://github.com/khoih-prog/ESP_DoubleResetDetector)' as it's a reasonably well supported library and this uses no more pins.**
 - Power by USB charger or batteries
@@ -58,7 +58,7 @@ The WeMos D1 mini has just enough pins free for this prop. Use the following wir
 - RFID MISO to pin D6 of the D1 mini
 - RFID SCK (CLK) to pin D5 of the D1 mini
 - RFID SDA (CS) to pin D8 of the D1 mini
-- RFID RST (Reset) to pin D3 of the D1 mini
+- ~~RFID RST (Reset) to pin D3 of the D1 mini~~ The MFRC522v2 library uses software reset.
 - D0 of the D1 mini looped to RST of the D1 mini. This is to allow deep sleep for power saving.
 - Battery holder + (red wire) to 5V of the D1 mini
 - Battery holder - (black wire) to GND
