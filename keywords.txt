@@ -36,3 +36,4 @@ clearEnteredCode	KEYWORD2
 
 //Wi-Fi admin
 enableWiFiAdminInterface	KEYWORD2
+adminOpened	KEYWORD2
