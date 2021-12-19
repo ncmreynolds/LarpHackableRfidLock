@@ -66,11 +66,11 @@ void ICACHE_FLASH_ATTR HTTPadminInterface::begin(uint8_t port) {
 	}
 	//Tab 0
 	tab_[0] = ESPUI.addControl(ControlType::Tab, "Door control", "Lock control");
-	button_[0] = ESPUI.addControl(ControlType::Button, "Open", "Press", ControlColor::Peterriver, tab_[0], HTTPadminInterfaceButtonCallbackWrapper);
-	button_[1] = ESPUI.addControl(ControlType::Button, "Unlock", "Press", ControlColor::Peterriver, tab_[0], HTTPadminInterfaceButtonCallbackWrapper);
-	button_[2] = ESPUI.addControl(ControlType::Button, "Lock", "Press", ControlColor::Peterriver, tab_[0], HTTPadminInterfaceButtonCallbackWrapper);
+	control_[0] = ESPUI.addControl(ControlType::Button, "Open", "Press", ControlColor::Peterriver, tab_[0], HTTPadminInterfaceButtonCallbackWrapper);
+	control_[1] = ESPUI.addControl(ControlType::Button, "Unlock", "Press", ControlColor::Peterriver, tab_[0], HTTPadminInterfaceButtonCallbackWrapper);
+	control_[2] = ESPUI.addControl(ControlType::Button, "Lock", "Press", ControlColor::Peterriver, tab_[0], HTTPadminInterfaceButtonCallbackWrapper);
 	//Tab 1
-	tab_[1] = ESPUI.addControl(ControlType::Tab, "Settings 2", "Lock Settings");
+	tab_[1] = ESPUI.addControl(ControlType::Tab, "Settings 2", "Card Admin");
 	//Tab 2
 	tab_[2] = ESPUI.addControl(ControlType::Tab, "Settings 3", "Lock Admin");
 	control_[3] = ESPUI.addControl(ControlType::Switcher, "WiFi client enabled", "", ControlColor::None, tab_[2], HTTPadminInterfaceButtonCallbackWrapper);
@@ -206,35 +206,174 @@ void HTTPadminInterface::printConnectionStatus_()
 }
 
 bool HTTPadminInterface::openButtonPushed() {
-	return(buttonState_[0]);
+	return(control_state_[0]);
 }
 
 void HTTPadminInterface::HTTPadminInterfaceButtonCallback(Control* sender, int type) {
-	if(sender->id == button_[0]) {
-		if(type = B_DOWN) {
-			buttonState_[0] = true;
+	if(sender->id == control_[0]) {
+		if(type == B_DOWN) {
+			control_state_[0] = true;
 		} else {
-			buttonState_[0] = false;
+			control_state_[0] = false;
 		}
 	}
 	else {
 		if(debugStream_ != nullptr) {
-			Serial.print("Text: ID: ");
-			Serial.print(sender->id);
-			Serial.print(", Value: ");
-			Serial.println( sender->value );
-		}
-		switch ( type ) {
-		case B_DOWN:
-			if(debugStream_ != nullptr) {
-			Serial.println( "Button DOWN" );
+			debugStream_->print(F("Control ID: "));
+			debugStream_->print(sender->id);
+			debugStream_->print(' ');
+			switch(sender->type) {
+				case Title:
+					debugStream_->print(F("Title: "));
+				break;
+				case Pad:
+					debugStream_->print(F("Pad: "));
+					switch ( type ) {
+					case P_LEFT_DOWN:
+						debugStream_->println( "LEFT DOWN" );
+					break;
+					case P_LEFT_UP:
+						debugStream_->println(F("LEFT UP"));
+					break;
+					case P_RIGHT_DOWN:
+						debugStream_->println(F("RIGHT DOWN"));
+					break;
+					case P_RIGHT_UP:
+						debugStream_->println(F("RIGHT UP"));
+					break;
+					case P_FOR_DOWN:
+						debugStream_->println(F("FORWARD DOWN"));
+					break;
+					case P_FOR_UP:
+						debugStream_->println(F("FORWARD UP"));
+					break;
+					case P_BACK_DOWN:
+						debugStream_->println(F("BACK DOWN"));
+					break;
+					case P_BACK_UP:
+						debugStream_->println(F("BACK UP"));
+					break;
+					}
+				break;
+				case PadWithCenter:
+					debugStream_->print(F("Pad with centre: "));
+					switch ( type ) {
+					case P_LEFT_DOWN:
+						debugStream_->println( "LEFT DOWN" );
+					break;
+					case P_LEFT_UP:
+						debugStream_->println(F("LEFT UP"));
+					break;
+					case P_RIGHT_DOWN:
+						debugStream_->println(F("RIGHT DOWN"));
+					break;
+					case P_RIGHT_UP:
+						debugStream_->println(F("RIGHT UP"));
+					break;
+					case P_FOR_DOWN:
+						debugStream_->println(F("FORWARD DOWN"));
+					break;
+					case P_FOR_UP:
+						debugStream_->println(F("FORWARD UP"));
+					break;
+					case P_BACK_DOWN:
+						debugStream_->println(F("BACK DOWN"));
+					break;
+					case P_BACK_UP:
+						debugStream_->println(F("BACK UP"));
+					break;
+					case P_CENTER_DOWN:
+						debugStream_->println(F("CENTER DOWN"));
+					break;
+					case P_CENTER_UP:
+						debugStream_->println(F("CENTER UP"));
+					break;
+					}
+				break;
+				case Button:
+					debugStream_->print(F("Button: "));
+					switch ( type ) {
+					case B_DOWN:
+						debugStream_->println(F("Button DOWN" ));
+					break;
+					case B_UP:
+						debugStream_->println(F("Button UP" ));
+					break;
+					}
+				break;
+				case Label:
+					debugStream_->print(F("Label "));
+					debugStream_->print(", value: ");
+					debugStream_->println( sender->value );
+				break;
+				case Switcher:
+					debugStream_->print(F("Switch: "));
+					switch ( type ) {
+					case S_ACTIVE:
+						if(debugStream_ != nullptr) {
+						Serial.println( "ON" );
+						}
+					break;
+					case S_INACTIVE:
+						if(debugStream_ != nullptr) {
+						Serial.println( "OFF" );
+						}
+					break;
+					}
+				break;
+				case Slider:
+					debugStream_->print(F("Slider: "));
+					debugStream_->println( sender->value );
+				break;
+				case Number:
+					debugStream_->print(F("Number: "));
+					debugStream_->println( sender->value );
+				break;
+				case Text:
+					debugStream_->print(F("Text: "));
+					debugStream_->println( sender->value );
+				break;
+				case Graph:
+					debugStream_->print(F("Graph: "));
+					debugStream_->println( sender->value );
+				break;
+				case GraphPoint:
+					debugStream_->print(F("Graph point: "));
+					debugStream_->println( sender->value );
+				break;
+				case Tab:
+					debugStream_->print(F("Tab: "));
+					debugStream_->println( sender->value );
+				break;
+				case Select:
+					debugStream_->print(F("Select: "));
+					debugStream_->println( sender->value );
+				break;
+				case Option:
+					debugStream_->print(F("Option: "));
+					debugStream_->println( sender->value );
+				break;
+				case Min:
+					debugStream_->print(F("Min: "));
+					debugStream_->println( sender->value );
+				break;
+				case Max:
+					debugStream_->print(F("Max: "));
+					debugStream_->println( sender->value );
+				break;
+				case Step:
+					debugStream_->print(F("Step: "));
+					debugStream_->println( sender->value );
+				break;
+				case Gauge:
+					debugStream_->print(F("Gauge: "));
+					debugStream_->println( sender->value );
+				break;
+				case Accel:
+					debugStream_->print(F("Accel: "));
+					debugStream_->println( sender->value );
+				break;
 			}
-		break;
-		case B_UP:
-			if(debugStream_ != nullptr) {
-			Serial.println( "Button UP" );
-			}
-		break;
 		}
 	}
 }

@@ -33,8 +33,7 @@ class HTTPadminInterface {
 		uint16_t connectionRetryFrequency = 1000;								//Interval between retries in ms
 		uint16_t tab_[3];
 		uint16_t control_[9];
-		uint16_t button_[3];													//Array of button IDs
-		bool buttonState_[3];													//Array of button states
+		bool control_state_[3];													//Array of button states
 		void printIpStatus_();													//Debug info about the IP status of the ESP
 		void printConnectionStatus_();											//Debug info about the connection status of the ESP
 };
