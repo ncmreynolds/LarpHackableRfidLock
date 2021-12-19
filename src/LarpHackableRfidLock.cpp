@@ -39,9 +39,9 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::begin(uint8_t id)	{
 		if(lock_uart != nullptr)
 		{
 			lock_uart->print(F("Lock is ready for configuration on SSID:"));
-			lock_uart->print(default_ssid);
+			lock_uart->print(default_softap_ssid);
 			lock_uart->print(F(" PSK:"));
-			lock_uart->println(default_psk);
+			lock_uart->println(default_softap_psk);
 		}
 		tone(buzzer_pin_, musicalTone[0], 500);
 	}
@@ -49,6 +49,52 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::begin(uint8_t id)	{
 	{
 		lock_uart->println(F("Starting normally"));
 	}
+}
+
+void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
+	this->reset_detector_.loop();
+	if(red_led_state_ == true && red_led_on_time_ > 0 && millis() - red_led_state_last_changed_ > red_led_on_time_)	//Switch off the red LED after red_led_on_time_
+	{
+		digitalWrite(red_led_pin_,red_led_pin_off_value_);
+		red_led_state_last_changed_ = millis();
+		red_led_on_time_ = 0;
+		red_led_state_ = false;
+	}
+	if(green_led_state_ == true && green_led_on_time_ > 0 && millis() - green_led_state_last_changed_ > green_led_on_time_)	//Switch off the red LED after green_led_on_time_
+	{
+		digitalWrite(green_led_pin_,green_led_pin_off_value_);
+		green_led_state_last_changed_ = millis();
+		green_led_on_time_ = 0;
+		green_led_state_ = false;
+	}
+	if(buzzer_state_ == true && millis() - buzzer_state_last_changed_ > buzzer_on_time_)	//Track how long the buzzer was on for
+	{
+		buzzer_state_last_changed_ = millis();
+		buzzer_state_ = false;
+	}
+	if(rfid_ != nullptr)	//Only run the RFID reader code if enabled
+	{
+		rfid_->pollForCard();
+	}
+	if(tapCode_ != nullptr)	//Only run the tap code sections if enabled
+	{
+		tapCode_->read();
+	}
+	/*if(http_admin_ != nullptr)
+	{
+		http_admin_->
+	}*/
+}
+
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::debug(Stream &terminalStream)
+{
+	lock_uart = &terminalStream;		//Set the stream used for the terminal
+	#if defined(ESP8266)
+	if(&terminalStream == &Serial)
+	{
+		  lock_uart->write(17);		//Send an XON to stop the hung terminal after reset on ESP8266
+	}
+	#endif
 }
 
 void ICACHE_FLASH_ATTR LarpHackableRfidLock::redLedOn(uint32_t on_time)	{
@@ -235,52 +281,28 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::clearEnteredCode() {
 	}
 }
 bool ICACHE_FLASH_ATTR LarpHackableRfidLock::doubleReset() {
-	if(this->reset_detector_.detectDoubleReset() == true)	{
+	if(this->reset_detector_.detectDoubleReset() == true) {
 		return(true);
 	}
 	return(false);
 }
 
-void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
-	this->reset_detector_.loop();
-	if(red_led_state_ == true && red_led_on_time_ > 0 && millis() - red_led_state_last_changed_ > red_led_on_time_)	//Switch off the red LED after red_led_on_time_
+/*
+ *	Wi-Fi admin interface
+ */
+ 
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::enableWiFiAdminInterface(uint8_t port) {
+	http_admin_ = new HTTPadminInterface;
+	if(lock_uart != nullptr)
 	{
-		digitalWrite(red_led_pin_,red_led_pin_off_value_);
-		red_led_state_last_changed_ = millis();
-		red_led_on_time_ = 0;
-		red_led_state_ = false;
+		http_admin_->debug(Serial); //Enable debugging
 	}
-	if(green_led_state_ == true && green_led_on_time_ > 0 && millis() - green_led_state_last_changed_ > green_led_on_time_)	//Switch off the red LED after green_led_on_time_
-	{
-		digitalWrite(green_led_pin_,green_led_pin_off_value_);
-		green_led_state_last_changed_ = millis();
-		green_led_on_time_ = 0;
-		green_led_state_ = false;
-	}
-	if(buzzer_state_ == true && millis() - buzzer_state_last_changed_ > buzzer_on_time_)	//Track how long the buzzer was on for
-	{
-		buzzer_state_last_changed_ = millis();
-		buzzer_state_ = false;
-	}
-	if(rfid_ != nullptr)	//Only run the RFID reader code if enabled
-	{
-		rfid_->pollForCard();
-	}
-	if(tapCode_ != nullptr)	//Only run the tap code sections if enabled
-	{
-		tapCode_->read();
-	}
+	http_admin_->begin(port);
 }
 
-void ICACHE_FLASH_ATTR LarpHackableRfidLock::debug(Stream &terminalStream)
-{
-	lock_uart = &terminalStream;		//Set the stream used for the terminal
-	#if defined(ESP8266)
-	if(&terminalStream == &Serial)
-	{
-		  lock_uart->write(17);		//Send an XON to stop the hung terminal after reset on ESP8266
-	}
-	#endif
+bool ICACHE_FLASH_ATTR LarpHackableRfidLock::adminOpened() {
+	return(http_admin_->openButtonPushed());
 }
+
 LarpHackableRfidLock Lock;
 #endif

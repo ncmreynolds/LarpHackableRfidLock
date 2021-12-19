@@ -25,6 +25,8 @@
 #include <ESP_DoubleResetDetector.h>
 //Tap code
 #include <TapCode.h>
+//Wi-Fi admin interface
+#include "HTTPadminInterface.h"
 
 class LarpHackableRfidLock	{
 
@@ -63,6 +65,9 @@ class LarpHackableRfidLock	{
 		bool codeMatches(char*);												//Does the code match
 		void clearEnteredCode();												//Reset the entered code
 		bool setTapCode(char*, uint8_t);										//Set the tap code for an action
+		//Wi-Fi admin interface
+		void enableWiFiAdminInterface(uint8_t port = 81);
+		bool adminOpened();														//Was the lock opened through the admin interface
 	protected:
 	private:
 		Stream *lock_uart = nullptr;											//The stream used for debugging
@@ -84,19 +89,22 @@ class LarpHackableRfidLock	{
 		uint32_t buzzer_state_last_changed_ = 0;								//Time when the state of the buzzer last changed
 		uint32_t buzzer_on_time_ = 0;
 		uint32_t max_buzzer_on_time_ = 60000;									//Maximum buzzer on time, to avoid total irritation
-		//RFID related
-		TrivialRFIDauthorisation* rfid_ = nullptr;								//Pointer to the RFID wrapper class
-		uint8_t rfid_authorisation_sector_ = 0;									//Sector where the RFID authorisation block is stored
 		//Reset detection
 		DoubleResetDetector reset_detector_;									//Double reset detector
-		//Wi-Fi
-		const char default_ssid[5] = "Lock";									//Default SSID when configuring lock
-		const char default_psk[8] = "LetMeIn";									//Default PSK when configuring lock
 		//Tones
 		uint16_t musicalTone[8] = { 1915, 1700, 1519, 1432, 1275, 1136, 1014, 956 };
 		//Tap code
 		TapCode* tapCode_ = nullptr;											//Pointer to the tap code class, if enabled
-		char* tapCodes[4];														//Array of pointers to tap codes for each event
+		//RFID related
+		TrivialRFIDauthorisation* rfid_ = nullptr;								//Pointer to the RFID wrapper class
+		uint8_t rfid_authorisation_sector_ = 0;									//Sector where the RFID authorisation block is stored
+		//Wi-Fi admin interface
+		HTTPadminInterface* http_admin_ = nullptr;								//Pointer to the HTTP admin interface class
+		const char default_softap_ssid[5] = "Lock";								//Default SSID when configuring lock
+		const char default_softap_psk[8] = "LetMeIn";							//Default PSK when configuring lock
+		char* lock_name_;
+		char* client_ssid_;
+		char* client_psk_;
 		
 };
 
