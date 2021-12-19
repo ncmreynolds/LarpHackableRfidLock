@@ -33,3 +33,6 @@ enableTapCode	KEYWORD2
 codeEntered	KEYWORD2
 codeMatches	KEYWORD2
 clearEnteredCode	KEYWORD2
+
+//Wi-Fi admin
+enableWiFiAdminInterface	KEYWORD2
