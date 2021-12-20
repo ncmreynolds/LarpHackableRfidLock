@@ -26,7 +26,18 @@
 //Tap code
 #include <TapCode.h>
 //Wi-Fi admin interface
-#include "HTTPadminInterface.h"
+//#include "HTTPadminInterface.h"
+//Get the right Wi-Fi library
+#if defined(ESP32)
+#include <WiFi.h>
+#else
+#include <ESP8266WiFi.h>
+#endif
+//Include ESPUI for the HTTP interface
+#include <ESPUI.h>
+#include <DNSServer.h>
+//LittleFS configuration storage
+#include <ArduinoJson.h>
 
 class LarpHackableRfidLock	{
 
@@ -68,9 +79,10 @@ class LarpHackableRfidLock	{
 		//Wi-Fi admin interface
 		void enableWiFiAdminInterface(uint8_t port = 81);
 		bool adminOpened();														//Was the lock opened through the admin interface
+		void HTTPCallback(Control* sender, int type);							//Callback function has to be public for the wrapper to work
 	protected:
 	private:
-		Stream *lock_uart = nullptr;											//The stream used for debugging
+		Stream *debugStream_ = nullptr;											//The stream used for debugging
 		uint8_t accessId = 0;													//ID used for access
 		uint8_t red_led_pin_ = D2;												//GPIO pin used for the red LED
 		uint8_t red_led_pin_on_value_ = HIGH;									//GPIO pin used for the red LED
@@ -99,13 +111,56 @@ class LarpHackableRfidLock	{
 		TrivialRFIDauthorisation* rfid_ = nullptr;								//Pointer to the RFID wrapper class
 		uint8_t rfid_authorisation_sector_ = 0;									//Sector where the RFID authorisation block is stored
 		//Wi-Fi admin interface
-		HTTPadminInterface* http_admin_ = nullptr;								//Pointer to the HTTP admin interface class
-		const char default_softap_ssid[5] = "Lock";								//Default SSID when configuring lock
-		const char default_softap_psk[8] = "LetMeIn";							//Default PSK when configuring lock
-		char* lock_name_;
-		char* client_ssid_;
-		char* client_psk_;
-		
+		uint8_t connectionRetries = 30;											//How many times a connection retries
+		uint16_t connectionRetryFrequency = 1000;								//Interval between retries in ms
+		//ESPUI
+		uint16_t tab_[3];
+		uint16_t control_[9];
+		bool control_state_[3];													//Array of button states
+		//IP/connection
+		void printIpStatus_();													//Debug info about the IP status of the ESP
+		void printConnectionStatus_();											//Debug info about the connection status of the ESP
+		//Client connection
+		uint8_t current_number_of_clients_ = 0;
+		uint8_t maximum_number_of_clients_ = 4;
+		//Captive port DNS server
+		DNSServer* captivePortalDnsServer;
+		bool dns_server_started_ = false;
+		//Configuration management
+		bool loadConfiguration(const char*);
+		bool saveConfiguration(const char*);
+		void loadDefaultConfiguration();
+		const char configuration_file_[16] = "lockConfig.json";					//Configuration file stored on LittleFS as key/value pairs
+		//Lock name
+		char* lock_name_ = nullptr;												//Configuration value
+		const char lock_name_key_[5] = "name";									//Key in key/value pair
+		const char lock_name_default_[5] = "Lock";								//Default value if key is missing
+		//Lock Access ID
+		uint8_t lock_access_id_;
+		const char lock_access_id_key_[9] = "accessId";
+		uint8_t lock_access_id_default_ = 0;
+		//Is the WiFi client enabled
+		bool wifi_client_enabled_ = false;
+		const char wifi_client_enabled_key_[18] = "wifiClientEnabled";
+		bool wifi_client_enabled_default_ = false;
+		//WiFi client SSID
+		char* wifi_client_ssid_ = nullptr;
+		const char wifi_client_ssid_key_[15] = "wifiClientSsid";
+		//WiFi client PSK
+		char* wifi_client_psk_ = nullptr;
+		const char wifi_client_psk_key_[14] = "wifiClientPsk";
+		//Is the WiFi AP enabled
+		bool wifi_ap_enabled_ = false;
+		const char wifi_ap_enabled_key_[18] = "wifiClientEnabled";
+		bool wifi_ap_enabled_default_ = true;
+		//WiFi AP SSID
+		char* wifi_ap_ssid_ = nullptr;
+		const char wifi_ap_ssid_key_[11] = "wifiApSsid";
+		const char wifi_ap_ssid_default_[18] = "LockConfiguration";
+		//WiFi AP PSK
+		char* wifi_ap_psk_ = nullptr;
+		const char wifi_ap_psk_key_[10] = "wifiApPsk";
+		const char wifi_ap_psk_default_[11] = "letmeinnow";
 };
 
 extern LarpHackableRfidLock Lock;
