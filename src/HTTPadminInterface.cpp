@@ -157,6 +157,7 @@ void HTTPadminInterface::printConnectionStatus_()
 			break;
 		}
 		#elif defined (ESP32)
+		/*
 		wifi_ap_record_t *ap_info;
 		if(esp_wifi_sta_get_ap_info(ap_info) == ESP_OK)
 		{
@@ -177,8 +178,10 @@ void HTTPadminInterface::printConnectionStatus_()
 				debugStream_->println(F("802.11 lr"));
 			}
 		} else {
+			*/
 			debugStream_->println(F("Unknown"));
-		}
+		//}
+		
 		#endif
 		break;
 		case WL_CONNECT_FAILED:

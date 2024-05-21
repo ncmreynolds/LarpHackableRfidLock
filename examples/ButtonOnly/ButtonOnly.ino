@@ -1,5 +1,5 @@
 /*
- * Example sketch for the lock prop, using Tap Code to control the lock
+ * Example sketch for the lock prop, using Tap Code, PIN and/or RFID to control the lock
  * 
  */
 
@@ -13,12 +13,6 @@
       #define SERIAL_DEBUG_PORT USBSerial
   #endif
 #endif
-
-uint32_t lastStats = 0;
-
-char codeToOpen[] = "Open";
-char codeToLock[] = "Lock";
-char codeToUnlock[] = "Unlock";
 
 void setup() {
   #ifdef DEBUG_ENABLED
@@ -34,18 +28,15 @@ void setup() {
     Lock.debug(SERIAL_DEBUG_PORT);
     delay(5000);
   #endif
+  #ifndef DEBUG_ENABLED
+    Lock.enableButton1(); //Enable button 1 on default pin
+  #endif
+  Lock.enableButton2(); //Enable button 2 on default pin
   Lock.enableButton3(); //Enable button 3 on default pin
-  Lock.enableTapCode(Lock.button3());  //Enable tap code
-  Lock.begin(); //Start the lock
+  Lock.enableOpenButton(Lock.button2()); //Enable button 3 on default pin
+  Lock.begin(); //Start the lock with a default access ID
 }
 
 void loop() {
-  Lock.housekeeping();
-  if(millis() - lastStats > 5000)
-  {
-    lastStats = millis();
-    Serial.print(F("Uptime: "));
-    Serial.print(float(millis())/60000.0);
-    Serial.println(F(" minutes"));
-  }
+  Lock.housekeeping();  //This is all you need for basic functionality and interactive behaviour baked into the library
 }

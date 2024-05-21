@@ -5,9 +5,9 @@
 #include <Arduino.h>
 //Get the right Wi-Fi library
 #if defined(ESP32)
-#include <WiFi.h>
+	#include <WiFi.h>
 #else
-#include <ESP8266WiFi.h>
+	#include <ESP8266WiFi.h>
 #endif
 //Include ESPUI for the HTTP interface
 #include <ESPUI.h>
@@ -25,8 +25,8 @@ class HTTPadminInterface {
 	private:
 		Stream *debugStream_ = nullptr;											//The stream used for debugging
 		char* hostname_ = nullptr;												//IP hostname, usually the lock's name, munged into an acceptable hostname
-		char clientPSK_[13] = "carolinaliar";
-		char clientSSID_[10] = "HMS Belly";
+		char clientPSK_[13] = "123412341234";
+		char clientSSID_[10] = "341523456";
 		char* basic_auth_username_ = nullptr;
 		char* basic_auth_password_ = nullptr;
 		uint8_t connectionRetries = 30;											//How many times a connection retries

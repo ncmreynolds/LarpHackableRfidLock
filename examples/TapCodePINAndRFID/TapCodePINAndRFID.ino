@@ -1,9 +1,10 @@
 /*
- * Example sketch for the lock prop, using Tap Code and/or RFID to control the lock
+ * Example sketch for the lock prop, using Tap Code, PIN and/or RFID to control the lock
  * 
  */
 
 #define DEBUG_ENABLED
+#define ENABLE_SERVO
 
 #include <LarpHackableRfidLock.h>
 #ifdef DEBUG_ENABLED
@@ -33,8 +34,8 @@ void setup() {
   #ifndef DEBUG_ENABLED
     Lock.enableButton1(); //Enable button 1 on default pin
   #endif
-  Lock.enableButton2(); //Enable button 2 on default pin
-  Lock.enableButton3(); //Enable button 3 on default pin
+  //Lock.enableButton2(); //Enable button 2 on default pin
+  //Lock.enableButton3(); //Enable button 3 on default pin
   Lock.enableRedLed();  //Enable the red LED on default pin
   Lock.enableMatrixKeypad();  //Enable the matrix keypad on default pins
   Lock.addPinToOpen((char*)"11111");
@@ -58,7 +59,6 @@ void setup() {
   Lock.addCodeToDenyNextCard((char*)"Deny");
   Lock.enableRFID();  //Enable RFID reader authorisation, CS on default pin, using default card sector
   Lock.begin(); //Start the lock with a default access ID
-  Lock.enableWiFiClient((char*)"HMS Belly", (char*)"carolinaliar");
 }
 
 void loop() {
@@ -71,3 +71,10 @@ void loop() {
     Serial.println(F(" minutes"));
   }
 }
+
+#ifdef ENABLE_SERVO
+void enableServo()
+{
+  
+}
+#endif
