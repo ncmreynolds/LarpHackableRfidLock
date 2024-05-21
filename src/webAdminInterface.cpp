@@ -311,6 +311,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::web_admin_control_page_button3_pres
 	if(Lock.debugStream_ != nullptr)	{
 		Lock.debugStream_->println(F("web_admin_control_page_button3_pressed Seal"));
 	}
+	Lock.seal();
 }
 void ICACHE_FLASH_ATTR LarpHackableRfidLock::webAdminControlPageCallback()	{
 	if(Lock.debugStream_ != nullptr)	{

@@ -64,7 +64,7 @@
 //#include <Servo.h>							//Support servo based locks
 #include <ESP32Servo.h>
 
-#include <ESPUI.h>
+#include <ESPUI.h>							//Hacking game support
 #include <ESPUIgames.h>
 
 const char web_admin_header_includes_[348] PROGMEM = "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><link href=\"//fonts.googleapis.com/css?family=Raleway:400,300,600\" rel=\"stylesheet\" type=\"text/css\"><link rel=\"stylesheet\" href=\"css/normalize.css\"><link rel=\"stylesheet\" href=\"css/skeleton.css\"><link rel=\"icon\" type=\"image/png\" href=\"images/favicon.png\">";
@@ -793,6 +793,7 @@ class LarpHackableRfidLock	{
 		String mqtt_topic_key_ = PSTR("mqttTopic");
 		//Hacking game
 		void setupGame();														//Set up the game
+		static void gameButtonCallback(Control* sender, int type);				// Lock control callbacks for the game
 		bool game_enabled_ = false;
 		bool game_enabled_default_ = false;
 		String game_enabled_key_ = PSTR("gameEnabled");
@@ -805,6 +806,14 @@ class LarpHackableRfidLock	{
 		uint8_t game_retries_ = 0;
 		uint8_t game_retries_default_ = 0;
 		String game_retries_key_ = PSTR("gameRetries");
+		uint16_t game_lock_controls_tab_id_ = 0;		//ESPUI tab ID
+		uint16_t game_lock_controls_button0_id_ = 0;	//ESPUI button IDs
+		uint16_t game_lock_controls_button1_id_ = 0;
+		uint16_t game_lock_controls_button2_id_ = 0;
+		uint16_t game_lock_controls_button3_id_ = 0;
+		bool hack_complete_ = false;
+		bool game_lock_controls_visible_ = false;
+		uint32_t turn_off_wifi_soon_ = 0;
 		//Multi-factor authentication
 		bool multi_factor_enabled_ = false;
 		bool multi_factor_enabled_default_ = false;

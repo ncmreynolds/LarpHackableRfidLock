@@ -496,8 +496,8 @@ bool ICACHE_FLASH_ATTR LarpHackableRfidLock::loadConfiguration(const char* filen
 			//Hacking game
 			game_enabled_ = doc[game_enabled_key_] | game_enabled_default_;
 			game_type_ =  doc[game_type_key_] | game_type_default_;
-			game_length_ = doc[game_length_key_] = game_length_default_;
-			game_retries_ = doc[game_retries_key_] = game_retries_default_;
+			game_length_ = doc[game_length_key_] | game_length_default_;
+			game_retries_ = doc[game_retries_key_] | game_retries_default_;
 			//Multi-factor authentication
 			multi_factor_enabled_ = doc[multi_factor_enabled_key_] | multi_factor_enabled_default_;
 			uint8_t multifactortype =  doc[multi_factor_type_key_] | 0;
@@ -1412,6 +1412,29 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 	#endif
 	if(game_enabled_) {
 		game.runFsm();  //Run the game finite state machine
+		if(game.won()) {
+			if(game_lock_controls_visible_ == false) {
+				hack_complete_ = true;
+				game_lock_controls_visible_ = true;
+				ESPUI.updateVisibility(game_lock_controls_tab_id_, true);
+			}
+		}
+		else if(hack_complete_ == true) {
+			hack_complete_ = false;
+			turn_off_wifi_soon_ = millis();
+			if(debugStream_ != nullptr) {
+				debugStream_->println(F("Hack complete, hiding lock controls again"));
+			}
+			ESPUI.updateVisibility(game_lock_controls_tab_id_, false);
+		}
+		if(turn_off_wifi_soon_ !=0 && millis() - turn_off_wifi_soon_ > 3e3)
+		{
+			turn_off_wifi_soon_ = 0;
+			if(debugStream_ != nullptr) {
+				debugStream_->println(F("Wifi Off"));
+			}
+			WiFi.mode(WIFI_OFF);
+		}
 	}
 	#ifdef HOUSEKEEPING_DEBUG
 		Serial.println(housekeepingdebug++);
@@ -2090,6 +2113,13 @@ void LarpHackableRfidLock::setupGame()
 		game.addPlayButton(PSTR("Delta"), PSTR("Hack"), ControlColor::Carrot);
 	}
 	game.addGameTab(); //Builds all the game controls
+	//Lock controls
+	game_lock_controls_tab_id_ = ESPUI.addControl(ControlType::Tab, PSTR("Entry control"), PSTR("Entry control"));	//Create the tab
+	game_lock_controls_button0_id_ = ESPUI.addControl(ControlType::Button, PSTR("Open once"), PSTR("Open"), ControlColor::Peterriver, game_lock_controls_tab_id_, &gameButtonCallback);
+	game_lock_controls_button1_id_ = ESPUI.addControl(ControlType::Button, PSTR("Open permanently"), PSTR("Unseal"), ControlColor::Peterriver, game_lock_controls_tab_id_, &gameButtonCallback);
+	game_lock_controls_button2_id_ = ESPUI.addControl(ControlType::Button, PSTR("Require Code/Card"), PSTR("Normal behaviour"), ControlColor::Peterriver, game_lock_controls_tab_id_, &gameButtonCallback);
+	game_lock_controls_button3_id_ = ESPUI.addControl(ControlType::Button, PSTR("Permanently Lock"), PSTR("Seal"), ControlColor::Peterriver, game_lock_controls_tab_id_, &gameButtonCallback);
+	ESPUI.updateVisibility(game_lock_controls_tab_id_, false);	//Hide the tabe
 	game.setHelpTabTitle(PSTR("OC: How to hack"));
 	if(game_type_ == 0) {
 		game.setHelpContent(
@@ -2104,6 +2134,47 @@ void LarpHackableRfidLock::setupGame()
 	}
 	game.addHelpTab(); //Builds all the help controls
 	ESPUI.begin(game.title());  //ESPUI is started from the sketch in case you want to add your own controls and pages as well before starting ESPUI
+}
+void LarpHackableRfidLock::gameButtonCallback(Control* sender, int type)
+{
+	if(Lock.debugStream_ != nullptr) {
+		//Lock.debugStream_->printf_P(PSTR("Game callback: %u %s\r\n"), sender->id, (type==B_DOWN ? PSTR("Down") : PSTR("Up")));	//Debug feedback in callback
+		if(type==B_UP)
+		{
+			if(sender->id == Lock.game_lock_controls_button0_id_)
+			{
+				Lock.debugStream_->println(PSTR("Hack: Open"));
+			}
+			else if(sender->id == Lock.game_lock_controls_button1_id_)
+			{
+				Lock.debugStream_->println(PSTR("Hack: Unseal"));
+			}
+			else if(sender->id == Lock.game_lock_controls_button2_id_)
+			{
+				Lock.debugStream_->println(PSTR("Hack: Normal"));
+			}
+			else if(sender->id == Lock.game_lock_controls_button3_id_)
+			{
+				Lock.debugStream_->println(PSTR("Hack: Seal"));
+			}
+		}
+	}
+	if(sender->id == Lock.game_lock_controls_button0_id_)
+	{
+		Lock.allow();
+	}
+	else if(sender->id == Lock.game_lock_controls_button1_id_)
+	{
+		Lock.unseal();
+	}
+	else if(sender->id == Lock.game_lock_controls_button2_id_)
+	{
+		Lock.normal();
+	}
+	else if(sender->id == Lock.game_lock_controls_button3_id_)
+	{
+		Lock.seal();
+	}
 }
 #ifdef DRD
 	bool ICACHE_FLASH_ATTR LarpHackableRfidLock::doubleReset() {

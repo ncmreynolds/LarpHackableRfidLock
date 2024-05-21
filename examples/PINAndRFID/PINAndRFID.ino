@@ -3,7 +3,7 @@
  * 
  */
 
-#define DEBUG_ENABLED
+//#define DEBUG_ENABLED
 
 #include <LarpHackableRfidLock.h>
 #ifdef DEBUG_ENABLED
