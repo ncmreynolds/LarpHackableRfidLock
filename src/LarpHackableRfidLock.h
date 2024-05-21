@@ -587,14 +587,19 @@ class LarpHackableRfidLock	{
 			static void webAdminMQTTSettingsPageSaveButtonPressed(EmbAJAXPushButton*);
 			static void webAdminMQTTSettingsPageCallback();
 			//Hacking game
-			EmbAJAXPage<32>* web_admin_game_settings_page_ = nullptr;
-			EmbAJAXBase* web_admin_game_settings_page_elements_[32];
+			static const uint8_t web_admin_game_settings_page_element_count_ = 52;
+			EmbAJAXPage<web_admin_game_settings_page_element_count_>* web_admin_game_settings_page_ = nullptr;
+			EmbAJAXBase* web_admin_game_settings_page_elements_[web_admin_game_settings_page_element_count_];
 			EmbAJAXStatic* web_admin_game_settings_page_static0_ = nullptr;
 			EmbAJAXStatic* web_admin_game_settings_page_static1_ = nullptr;
 			EmbAJAXStatic* web_admin_game_settings_page_static2_ = nullptr;
+			EmbAJAXStatic* web_admin_game_settings_page_static3_ = nullptr;
+			EmbAJAXStatic* web_admin_game_settings_page_static4_ = nullptr;
 			EmbAJAXCheckButton* web_admin_game_settings_page_check0_ = nullptr;
 			EmbAJAXRadioGroup<2>* web_admin_game_settings_page_radio0_ = nullptr;
 			char* web_admin_game_settings_page_radio0_options_[2];
+			EmbAJAXSlider* web_admin_game_settings_page_slider0_ = nullptr;
+			EmbAJAXSlider* web_admin_game_settings_page_slider1_ = nullptr;
 			EmbAJAXPushButton* web_admin_game_settings_page_save_button_ = nullptr;
 			void createWebAdminGameSettingsPage();
 			static void webAdminGameSettingsPageSaveButtonPressed(EmbAJAXPushButton*);
@@ -794,6 +799,12 @@ class LarpHackableRfidLock	{
 		uint8_t game_type_ = 0;
 		uint8_t game_type_default_ = 0;
 		String game_type_key_ = PSTR("gameType");
+		uint8_t game_length_ = 10;
+		uint8_t game_length_default_ = 20;
+		String game_length_key_ = PSTR("gameLength");
+		uint8_t game_retries_ = 0;
+		uint8_t game_retries_default_ = 0;
+		String game_retries_key_ = PSTR("gameRetries");
 		//Multi-factor authentication
 		bool multi_factor_enabled_ = false;
 		bool multi_factor_enabled_default_ = false;

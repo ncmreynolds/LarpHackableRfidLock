@@ -496,6 +496,8 @@ bool ICACHE_FLASH_ATTR LarpHackableRfidLock::loadConfiguration(const char* filen
 			//Hacking game
 			game_enabled_ = doc[game_enabled_key_] | game_enabled_default_;
 			game_type_ =  doc[game_type_key_] | game_type_default_;
+			game_length_ = doc[game_length_key_] = game_length_default_;
+			game_retries_ = doc[game_retries_key_] = game_retries_default_;
 			//Multi-factor authentication
 			multi_factor_enabled_ = doc[multi_factor_enabled_key_] | multi_factor_enabled_default_;
 			uint8_t multifactortype =  doc[multi_factor_type_key_] | 0;
@@ -738,6 +740,8 @@ bool ICACHE_FLASH_ATTR LarpHackableRfidLock::saveConfiguration(const char* filen
 		//Hacking game
 		doc[game_enabled_key_] = game_enabled_;
 		doc[game_type_key_] = game_type_;
+		doc[game_length_key_] = game_length_;
+		doc[game_retries_key_] = game_retries_;
 		//Multi-factor authentication
 		doc[multi_factor_enabled_key_] = multi_factor_enabled_;
 		doc[multi_factor_type_key_] = (int)multi_factor_type_;
@@ -1406,6 +1410,12 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 	#ifdef HOUSEKEEPING_DEBUG
 		Serial.println(housekeepingdebug++);
 	#endif
+	if(game_enabled_) {
+		game.runFsm();  //Run the game finite state machine
+	}
+	#ifdef HOUSEKEEPING_DEBUG
+		Serial.println(housekeepingdebug++);
+	#endif
 	if(dns_server_started_ == true) {
 		  captivePortalDnsServer->processNextRequest();
 	}
@@ -2051,34 +2061,49 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::clearEnteredCode() {
 void LarpHackableRfidLock::setupGame()
 {
 	if(game_type_ == 0) {
-	game.type(ESPUIgames::gameType::whackamole);
-  } else {
-	game.type(ESPUIgames::gameType::simon);
-  }
-  game.setMaximumAttempts(3);
-  #if defined(ENABLE_TESTING)
-    game.setLength(10); //Whack 10 moles to win
-  #else
-    game.setLength(30); //Whack 30 moles to win
-  #endif
-  //Game tab
-  game.setTitle(PSTR("Game title"));
-  game.setTabTitle(PSTR("Game"));
-  game.enableStartSwitch(PSTR("Hack!"));
-  game.setWinContent("Security breached","You won"); //Setting this makes a widget pop up if you win, not setting it relies on colours alone to show it
-  game.setLoseContent("Hack failed!","Flick the switch to try again","No further hack attempts possible"); //Setting this makes a widget pop up if you lose, not setting it relies on colours alone to show it
-  game.addPlayButton("Core Operating system", "Hack", ControlColor::Peterriver);
-  game.addPlayButton("Secure storage", "Hack", ControlColor::Sunflower);
-  game.addPlayButton("System bus", "Hack", ControlColor::Turquoise);
-  game.addPlayButton("Watchdog Daemon", "Hack", ControlColor::Carrot);
-  game.addGameTab(); //Builds all the game controls
-  game.setHelpTabTitle(PSTR("Help"));
-  game.setHelpContent(
-      PSTR("How to play this game"),
-      PSTR("Toggle the 'Hack!' switch to start the game.<br /><br />Every time a button lights, press it. If you react fast enough for long enough you will win.<br /><br />When you win all the controls turn green.<br /><br />If you don't hit all the buttons fast enough all the controls turn red and it will tell you.<br /><br />You can restart the hack by flicking the 'Hack!' switch and it will start from scratch but you only get <b>three attempts</b> and the game will get harder.<br /><br />After you have downloaded the files you want, if you flick the 'Hack' button to the off position, it clears up so it looks like you were never there and disconnects you.<br /><br />Please remember to disconnect after the hack otherwise you won't be able to receive incoming video calls.")
-      );
-  game.addHelpTab(); //Builds all the help controls
-  ESPUI.begin(game.title());  //ESPUI is started from the sketch in case you want to add your own controls and pages as well before starting ESPUI
+		game.type(ESPUIgames::gameType::whackamole);
+	} else {
+		game.type(ESPUIgames::gameType::simon);
+	}
+	game.setLength(game_length_); //Whack 10 moles to win
+	game.setMaximumAttempts(game_retries_);
+	//Game tab
+	game.setTitle(lock_name_.c_str());
+	game.setTabTitle(PSTR("Entry Security"));
+	game.enableStartSwitch(PSTR("Hack!"));
+	game.setWinContent(
+		PSTR("Lock breached"),
+		PSTR("See the controls in the new tab that has appeared.")); //Setting this makes a widget pop up if you win, not setting it relies on colours alone to show it
+	game.setLoseContent(
+		PSTR("Hack failed!"),
+		PSTR("Flick the switch to try again"),
+		PSTR("No further hack attempts possible")); //Setting this makes a widget pop up if you lose, not setting it relies on colours alone to show it
+	if(game_type_ == 0) {	//Whack-a-mole
+		game.addPlayButton(PSTR("Core Operating system"), PSTR("Hack"), ControlColor::Peterriver);
+		game.addPlayButton(PSTR("Secure storage"), PSTR("Hack"), ControlColor::Sunflower);
+		game.addPlayButton(PSTR("System bus"), PSTR("Hack"), ControlColor::Turquoise);
+		game.addPlayButton(PSTR("Watchdog Daemon"), PSTR("Hack"), ControlColor::Carrot);
+	} else {	//Simon
+		game.addPlayButton(PSTR("Alpha"), PSTR("Hack"), ControlColor::Peterriver);
+		game.addPlayButton(PSTR("Beta"), PSTR("Hack"), ControlColor::Sunflower);
+		game.addPlayButton(PSTR("Gamma"), PSTR("Hack"), ControlColor::Turquoise);
+		game.addPlayButton(PSTR("Delta"), PSTR("Hack"), ControlColor::Carrot);
+	}
+	game.addGameTab(); //Builds all the game controls
+	game.setHelpTabTitle(PSTR("OC: How to hack"));
+	if(game_type_ == 0) {
+		game.setHelpContent(
+			PSTR("How to play this game"),
+			PSTR("Toggle the 'Hack!' switch to start the game.<br /><br />Every time a button lights, press it. If you react fast enough for long enough you will win.<br /><br />When you win all the controls turn green.<br /><br />If you don't hit all the buttons fast enough all the controls turn red and it will tell you what to do next.<br /><br />You can restart the hack by flicking the 'Hack!' switch and it will start from scratch but you only get <b>three attempts</b> and the game will get harder.<br /><br />After you have downloaded the files you want, if you flick the 'Hack' button to the off position, it clears up so it looks like you were never there and disconnects you.<br /><br />Please remember to disconnect after the hack otherwise you won't be able to receive incoming video calls.")
+		);
+	} else {
+		game.setHelpContent(
+			PSTR("How to play this game"),
+			PSTR("Toggle the 'Hack!' switch to start the game.<br /><br />Repeat the sequence of lit buttons back on the screen just as it happened. If you get this right for long enough, eventually you will win. Hint: nothing is stopping you from writing the sequence down.<br /><br />When you win all the controls turn green and it will tell you what to do next.<br /><br />If you get something wrong, all the controls turn red.<br /><br />You can restart the hack by flicking the 'Hack!' switch and it will start from scratch but you only get <b>three attempts</b> and the game will get harder.<br /><br />After you have done what you want, if you flick the 'Hack' button to the off position, it clears up so it looks like you were never there and disconnects you.<br /><br />Please remember to disconnect after the hack otherwise you won't be able to receive incoming video calls.")
+		);
+	}
+	game.addHelpTab(); //Builds all the help controls
+	ESPUI.begin(game.title());  //ESPUI is started from the sketch in case you want to add your own controls and pages as well before starting ESPUI
 }
 #ifdef DRD
 	bool ICACHE_FLASH_ATTR LarpHackableRfidLock::doubleReset() {

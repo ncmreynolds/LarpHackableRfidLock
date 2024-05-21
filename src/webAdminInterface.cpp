@@ -1057,12 +1057,25 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminGameSettingsPage()	{
 	web_admin_game_settings_page_static0_ = new EmbAJAXStatic(PSTR("<h1>Hacking game</h1>"));
 	web_admin_game_settings_page_static1_ = new EmbAJAXStatic(PSTR("Hacking game enabled"));
 	web_admin_game_settings_page_static2_ = new EmbAJAXStatic(PSTR("Game type"));
+	web_admin_game_settings_page_static3_ = new EmbAJAXStatic(PSTR("Game length"));
+	web_admin_game_settings_page_static4_ = new EmbAJAXStatic(PSTR("Game retries (0=infinite)"));
+	//Game enabled
 	web_admin_game_settings_page_check0_ = new EmbAJAXCheckButton(PSTR("check0"));
+	//Type
 	web_admin_game_settings_page_radio0_options_[0] = new char[13];
 	strlcpy(web_admin_game_settings_page_radio0_options_[0], "Whack-a-mole", 13);
 	web_admin_game_settings_page_radio0_options_[1] = new char[11];
 	strlcpy(web_admin_game_settings_page_radio0_options_[1], "Simon says", 11);
 	web_admin_game_settings_page_radio0_ = new EmbAJAXRadioGroup<2>(PSTR("radio0"), (const char**)web_admin_game_settings_page_radio0_options_);
+	//Game length
+	if(game_type_ == 0) {
+		web_admin_game_settings_page_slider0_ = new EmbAJAXSlider(PSTR("slider0"),3,50,game_length_);	//Whack a mole
+	} else {
+		web_admin_game_settings_page_slider0_ = new EmbAJAXSlider(PSTR("slider0"),3,10,game_length_);	//Simon
+	}
+	//Game retries
+	web_admin_game_settings_page_slider1_ = new EmbAJAXSlider(PSTR("slider1"),0,10,game_retries_);
+	//Save
 	web_admin_game_settings_page_save_button_ = new EmbAJAXPushButton(PSTR("save"), PSTR("Save"), webAdminGameSettingsPageSaveButtonPressed);
 	web_admin_game_settings_page_save_button_->setVisible(false);
 	uint8_t index = 0;
@@ -1090,6 +1103,26 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminGameSettingsPage()	{
 			web_admin_game_settings_page_elements_[index++] = endDiv_;
 		web_admin_game_settings_page_elements_[index++] = endDiv_;
 		web_admin_game_settings_page_elements_[index++] = startRowDiv_;
+			web_admin_game_settings_page_elements_[index++] = startTwelveColumnDiv_;
+				web_admin_game_settings_page_elements_[index++] = web_admin_game_settings_page_static3_;
+			web_admin_game_settings_page_elements_[index++] = endDiv_;
+		web_admin_game_settings_page_elements_[index++] = endDiv_;
+		web_admin_game_settings_page_elements_[index++] = startRowDiv_;
+			web_admin_game_settings_page_elements_[index++] = startTwelveColumnDiv_;
+				web_admin_game_settings_page_elements_[index++] = web_admin_game_settings_page_slider0_;
+			web_admin_game_settings_page_elements_[index++] = endDiv_;
+		web_admin_game_settings_page_elements_[index++] = endDiv_;
+		web_admin_game_settings_page_elements_[index++] = startRowDiv_;
+			web_admin_game_settings_page_elements_[index++] = startTwelveColumnDiv_;
+				web_admin_game_settings_page_elements_[index++] = web_admin_game_settings_page_static4_;
+			web_admin_game_settings_page_elements_[index++] = endDiv_;
+		web_admin_game_settings_page_elements_[index++] = endDiv_;
+		web_admin_game_settings_page_elements_[index++] = startRowDiv_;
+			web_admin_game_settings_page_elements_[index++] = startTwelveColumnDiv_;
+				web_admin_game_settings_page_elements_[index++] = web_admin_game_settings_page_slider1_;
+			web_admin_game_settings_page_elements_[index++] = endDiv_;
+		web_admin_game_settings_page_elements_[index++] = endDiv_;
+		web_admin_game_settings_page_elements_[index++] = startRowDiv_;
 			web_admin_game_settings_page_elements_[index++] = startTenColumnDiv_;
 				web_admin_game_settings_page_elements_[index++] = nbsp_;
 			web_admin_game_settings_page_elements_[index++] = endDiv_;
@@ -1098,10 +1131,12 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminGameSettingsPage()	{
 			web_admin_game_settings_page_elements_[index++] = endDiv_;
 		web_admin_game_settings_page_elements_[index++] = endDiv_;
 	web_admin_game_settings_page_elements_[index++] = endDiv_;
-	web_admin_game_settings_page_ = new EmbAJAXPage<32>(web_admin_game_settings_page_elements_, PSTR("Hacking game"), web_admin_header_includes_);
+	web_admin_game_settings_page_ = new EmbAJAXPage<web_admin_game_settings_page_element_count_>(web_admin_game_settings_page_elements_, PSTR("Hacking game"), web_admin_header_includes_);
 	webAdminInterface_->installPage(web_admin_game_settings_page_, PSTR("/game"), webAdminGameSettingsPageCallback);
 	web_admin_game_settings_page_check0_->setChecked(game_enabled_);
 	web_admin_game_settings_page_radio0_->selectOption(game_type_);
+	web_admin_game_settings_page_slider0_->setValue(game_length_);
+	web_admin_game_settings_page_slider1_->setValue(game_retries_);
 }
 void ICACHE_FLASH_ATTR LarpHackableRfidLock::webAdminGameSettingsPageCallback()	{
 	if(Lock.debugStream_ != nullptr)	{
@@ -1118,6 +1153,8 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::webAdminGameSettingsPageSaveButtonP
 		Lock.game_enabled_ = Lock.web_admin_game_settings_page_check0_->isChecked();
 		Lock.game_enabled_ = Lock.web_admin_game_settings_page_check0_->isChecked();
 		Lock.game_type_ = Lock.web_admin_game_settings_page_radio0_->selectedOption();
+		Lock.game_length_ = Lock.web_admin_game_settings_page_slider0_->intValue ();
+		Lock.game_retries_ = Lock.web_admin_game_settings_page_slider1_->intValue ();
 		Lock.save_configuration_soon_ = millis();
 	}
 }
