@@ -650,7 +650,8 @@ class LarpHackableRfidLock	{
 		char lock_access_group_key_[9] = "accessId";
 		uint8_t lock_access_group_default_ = 0;
 		//Is PIN entry enabled
-		bool pin_entry_enabled_ = true;
+		bool pin_entry_enabled_ = false;
+		bool pin_entry_enabled_default_ = false;
 		String pin_entry_enabled_key_  = "pin_entry_enabled_";
 		String pin_to_open_ = "";
 		String pin_to_open_key_ = "pin_to_open_";

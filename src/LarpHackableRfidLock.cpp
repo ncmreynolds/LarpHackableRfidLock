@@ -456,7 +456,7 @@ bool ICACHE_FLASH_ATTR LarpHackableRfidLock::loadConfiguration(const char* filen
 			tap_code_revoke_ = doc[tap_code_revoke_key_] | tap_code_revoke_default_;
 			tap_code_revoke_all_ = doc[tap_code_revoke_all_key_] | tap_code_revoke_all_default_;
 			//PIN codes
-			pin_entry_enabled_ == doc[pin_entry_enabled_key_];
+			pin_entry_enabled_ = doc[pin_entry_enabled_key_] | pin_entry_enabled_default_;
 			pin_to_open_ = doc[pin_to_open_key_] | pin_to_open_default_;
 			pin_to_seal_ = doc[pin_to_seal_key_] | pin_to_seal_default_;
 			pin_to_unseal_ = doc[pin_to_unseal_key_] | pin_to_unseal_default_;
@@ -700,7 +700,7 @@ bool ICACHE_FLASH_ATTR LarpHackableRfidLock::saveConfiguration(const char* filen
 		doc[tap_code_revoke_key_] = tap_code_revoke_;
 		doc[tap_code_revoke_all_key_] = tap_code_revoke_all_;
 		//PIN codes
-		//doc[pin_entry_enabled_key_] = pin_entry_enabled_;
+		doc[pin_entry_enabled_key_] = pin_entry_enabled_;
 		doc[pin_to_open_key_] = pin_to_open_;
 		doc[pin_to_seal_key_] = pin_to_seal_;
 		doc[pin_to_unseal_key_] = pin_to_unseal_;
@@ -1043,7 +1043,7 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 	#ifdef HOUSEKEEPING_DEBUG
 		Serial.println(housekeepingdebug++);	//8
 	#endif
-	if(rfid_reader_intialised_ == true && rfid_ != nullptr)	{	//Only run the RFID reader code if enabled
+	if(rfid_authorisation_enabled_ == true && rfid_reader_intialised_ == true && rfid_ != nullptr)	{	//Only run the RFID reader code if enabled and initialised
 		rfid_->pollForCard();
 	}
 	//Manage TapCode
@@ -1212,7 +1212,8 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 	#ifdef HOUSEKEEPING_DEBUG
 		Serial.println(housekeepingdebug++);	//15
 	#endif
-	if(pinEntered()) { //Check if a pin has been entered and clear if it has
+	//Check for entered pins from the matrix
+	if(pin_entered_ == true && millis() - last_pin_entry_ > 250) { //Check if a pin has been entered and clear if it has
 		if(pin_entry_enabled_ == true) {
 			if(pin_to_open_.length() != 0 && pinMatches(pin_to_open_)) {  //PIN matches the 'open' one
 				if(multi_factor_enabled_ == true)	{
@@ -1267,6 +1268,8 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 			} else {  //Deny access
 				deny();
 			}
+		} else {  //Deny access
+			deny();
 		}
 		clearEnteredPin();
 	}
