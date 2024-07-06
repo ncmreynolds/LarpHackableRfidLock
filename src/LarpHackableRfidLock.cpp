@@ -35,6 +35,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::begin(uint8_t id)	{
 		debugStream_->print(F("Restart reason: "));
 		es32printResetReason(0);
 	}
+	setupPowerSaving();	//Detect CPU speeds available
 	if(LittleFS.begin()) {	//This will fail if not formatted, but ESP8266 will format it for you then fail
 		if(debugStream_ != nullptr) {
 			debugStream_->println(F("LittleFS filesystem mounted"));
@@ -90,27 +91,44 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::begin(uint8_t id)	{
 	}
 	if(red_led_fitted_)	{
 		if(debugStream_ != nullptr) {
-			debugStream_->println(F("Initialising red LED"));
+			debugStream_->print(F("Initialising red LED on pin:"));
+			debugStream_->print(red_led_pin_);
 		}
 		//Only configure the red LED pin if it's NOT shared with a button
 		if((button1_fitted_ == false || red_led_pin_ != button1_pin_) && (button2_fitted_ == false || red_led_pin_ != button2_pin_) && (button3_fitted_ == false || red_led_pin_ != button3_pin_))	{
 			pinMode(red_led_pin_,OUTPUT);
 			digitalWrite(red_led_pin_,red_led_pin_off_value_);
+			if(debugStream_ != nullptr) {
+				debugStream_->println();
+			}
+		} else {
+			if(debugStream_ != nullptr) {
+				debugStream_->println(F(" shared"));
+			}
 		}
 	}
 	if(green_led_fitted_)	{
 		if(debugStream_ != nullptr) {
-			debugStream_->println(F("Initialising green LED"));
+			debugStream_->print(F("Initialising green LED on pin:"));
+			debugStream_->print(green_led_pin_);
 		}
 		//Only configure the green LED pin if it's NOT shared with a button
 		if((button1_fitted_ == false || green_led_pin_ != button1_pin_) && (button2_fitted_ == false || green_led_pin_ != button2_pin_) && (button3_fitted_ == false || green_led_pin_ != button3_pin_))	{
 			pinMode(green_led_pin_,OUTPUT);
 			digitalWrite(green_led_pin_,green_led_pin_off_value_);
+			if(debugStream_ != nullptr) {
+				debugStream_->println();
+			}
+		} else {
+			if(debugStream_ != nullptr) {
+				debugStream_->println(F(" shared"));
+			}
 		}
 	}
 	if(button1_fitted_ == true)	{
 		if(debugStream_ != nullptr) {
-			debugStream_->println(F("Initialising button 1"));
+			debugStream_->print(F("Initialising button 1 on pin:"));
+			debugStream_->println(button1_pin_);
 		}
 		if(button1_pin_ != tapCode_pin_)	{
 			pinMode(button1_pin_,INPUT_PULLUP);
@@ -119,7 +137,8 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::begin(uint8_t id)	{
 	}
 	if(button2_fitted_ == true)	{
 		if(debugStream_ != nullptr) {
-			debugStream_->println(F("Initialising button 2"));
+			debugStream_->print(F("Initialising button 2 on pin:"));
+			debugStream_->println(button2_pin_);
 		}
 		if(button2_pin_ != tapCode_pin_)	{
 			pinMode(button2_pin_,INPUT_PULLUP);
@@ -128,7 +147,8 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::begin(uint8_t id)	{
 	}
 	if(button3_fitted_ == true)	{
 		if(debugStream_ != nullptr) {
-			debugStream_->println(F("Initialising button 3"));
+			debugStream_->print(F("Initialising button 3 on pin:"));
+			debugStream_->println(button3_pin_);
 		}
 		if(button3_pin_ != tapCode_pin_)	{
 			pinMode(button3_pin_,INPUT_PULLUP);
@@ -149,11 +169,16 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::begin(uint8_t id)	{
 		if(debugStream_ != nullptr) {
 			debugStream_->println(F("Initialising buzzer"));
 		}
-		pinMode(buzzer_pin_,OUTPUT);
 		#if defined ESP8266
 			noTone(buzzer_pin_);
 		#elif defined ESP32
-			ledcSetup(buzzer_channel_, 440, 8);
+			#ifdef ESP_IDF_VERSION_MAJOR // IDF 4+
+				#if ESP_IDF_VERSION_MAJOR == 4
+					ledcSetup(buzzer_channel_, 440, 8);	//Old setup function
+				#elif ESP_IDF_VERSION_MAJOR == 5
+					ledcAttach(buzzer_pin_, 440, 14);
+				#endif
+			#endif
 			pinMode(buzzer_pin_,OUTPUT);
 			digitalWrite(buzzer_pin_, buzzer_pin_off_value_);
 		#endif
@@ -264,30 +289,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::enableWiFiClient(char* SSID, char* 
 void ICACHE_FLASH_ATTR LarpHackableRfidLock::configureWifi() {
 	//Configure WiFi
 	WiFi.persistent(false);										//Avoid flash wear
-	if(wifi_client_enabled_ == true && wifi_client_ssid_ != nullptr && wifi_client_psk_!=nullptr && wifi_ap_enabled_ == true && wifi_ap_ssid_ != nullptr && wifi_ap_psk_!=nullptr) {
-		WiFi.mode(WIFI_AP_STA);
-		if(debugStream_ != nullptr)	{
-			debugStream_->println(F("WiFi mode:station & AP"));
-		}
-	} else if(wifi_client_enabled_ == true && wifi_client_ssid_ != nullptr && wifi_client_psk_!=nullptr) {
-		if(debugStream_ != nullptr)	{
-			debugStream_->println(F("WiFi mode:station"));
-		}
-		WiFi.mode(WIFI_STA);
-	} else if(wifi_ap_enabled_ == true && wifi_ap_ssid_ != nullptr && wifi_ap_psk_!=nullptr) {
-		if(debugStream_ != nullptr)	{
-			debugStream_->println(F("WiFi mode:AP"));
-		}
-		WiFi.mode(WIFI_AP);
-	} else {
-		if(debugStream_ != nullptr)	{
-			debugStream_->println(F("WiFi mode:Disabled"));
-			WiFi.mode(WIFI_OFF);
-			#if defined(ESP8266)
-				WiFi.forceSleepBegin();
-			#endif
-		}
-	}
+	setWiFiMode();
 	if(lock_name_.length() > 0 && (wifi_client_enabled_ == true || wifi_ap_enabled_ == true)) {
 		#if defined(ESP32)
 			WiFi.setHostname(lock_name_.c_str());
@@ -345,6 +347,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::configureWifi() {
 		#elif defined(ESP32)
 			if(WiFi.softAP(wifi_ap_ssid_.c_str(), wifi_ap_psk_.c_str(), wifi_ap_channel_, (wifi_ap_hidden_ == true ? 1 : 0), wifi_ap_maximum_clients_, false) == true) {
 		#endif
+			wifi_ap_active_ = true;
 			if(debugStream_ != nullptr) {
 				debugStream_->print(F(" - success AP IP:"));
 				debugStream_->println(WiFi.softAPIP());
@@ -376,6 +379,54 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::configureWifi() {
 	}
 }
 
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::setWiFiMode() {
+	if(wifi_client_enabled_ == true && wifi_client_ssid_ != nullptr && wifi_client_psk_!=nullptr && wifi_ap_enabled_ == true && wifi_ap_ssid_ != nullptr && wifi_ap_psk_!=nullptr) {
+		WiFi.mode(WIFI_AP_STA);
+		if(debugStream_ != nullptr)	{
+			debugStream_->println(F("WiFi mode:station & AP"));
+		}
+	} else if(wifi_client_enabled_ == true && wifi_client_ssid_ != nullptr && wifi_client_psk_!=nullptr) {
+		WiFi.mode(WIFI_STA);
+		if(debugStream_ != nullptr)	{
+			debugStream_->println(F("WiFi mode:station"));
+		}
+	} else if(wifi_ap_enabled_ == true && wifi_ap_ssid_ != nullptr && wifi_ap_psk_!=nullptr) {
+		WiFi.mode(WIFI_AP);
+		if(debugStream_ != nullptr)	{
+			debugStream_->println(F("WiFi mode:AP"));
+		}
+	} else {
+		WiFi.mode(WIFI_OFF);
+		#if defined(ESP8266)
+			WiFi.forceSleepBegin();
+		#endif
+		if(debugStream_ != nullptr)	{
+			debugStream_->println(F("WiFi mode:Disabled"));
+		}
+	}
+}
+
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::disableWiFiAp() {
+	if(wifi_client_enabled_ == true && wifi_client_ssid_ != nullptr && wifi_client_psk_!=nullptr && wifi_ap_enabled_ == true && wifi_ap_ssid_ != nullptr && wifi_ap_psk_!=nullptr) {
+		WiFi.mode(WIFI_STA);
+		if(debugStream_ != nullptr)	{
+			debugStream_->println(F("WiFi mode: AP"));
+		}
+	} else {
+		if(debugStream_ != nullptr)	{
+			debugStream_->println(F("WiFi mode:Disabled"));
+			WiFi.mode(WIFI_OFF);
+			#if defined(ESP8266)
+				WiFi.forceSleepBegin();
+			#endif
+		}
+	}
+}
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::reEnableWiFiAp() {
+	wifi_ap_inactivity_shutdown_timer_ = millis();
+	wifi_ap_active_ = true;
+	setWiFiMode();
+}
 void ICACHE_FLASH_ATTR LarpHackableRfidLock::configureTimeServer() {
 	configTime(0, 0, ntp_server_.c_str());	//Set server
 	if(ntp_timezone_.length() > 0) {
@@ -399,6 +450,8 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::loadDefaultConfiguration() {
 	tap_code_authorise_ = tap_code_authorise_default_;
 	tap_code_revoke_ = tap_code_revoke_default_;
 	tap_code_revoke_all_ = tap_code_revoke_all_default_;
+	//Lock picking
+	lock_picking_enabled_ = lock_picking_enabled_default_;
 	//Mesh Network
 	mesh_network_enabled_ = mesh_network_enabled_default_;
 	mesh_network_channel_ = mesh_network_channel_default_;
@@ -415,6 +468,8 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::loadDefaultConfiguration() {
 	//WiFi AP
 	wifi_ap_enabled_ = wifi_ap_enabled_default_;
 	wifi_ap_hidden_ = wifi_ap_hidden_default_;
+	wifi_ap_captive_portal_ = wifi_ap_captive_portal_default_;
+	wifi_ap_inactivity_shutdown_ = wifi_ap_inactivity_shutdown_default_;
 	wifi_ap_ssid_ = wifi_ap_ssid_default_;
 	wifi_ap_psk_ = wifi_ap_psk_default_;
 }
@@ -455,6 +510,8 @@ bool ICACHE_FLASH_ATTR LarpHackableRfidLock::loadConfiguration(const char* filen
 			tap_code_authorise_ = doc[tap_code_authorise_key_] | tap_code_authorise_default_;
 			tap_code_revoke_ = doc[tap_code_revoke_key_] | tap_code_revoke_default_;
 			tap_code_revoke_all_ = doc[tap_code_revoke_all_key_] | tap_code_revoke_all_default_;
+			//Lock picking
+			lock_picking_enabled_ = doc[lock_picking_enabled_key_] | lock_picking_enabled_default_;
 			//PIN codes
 			pin_entry_enabled_ = doc[pin_entry_enabled_key_] | pin_entry_enabled_default_;
 			pin_to_open_ = doc[pin_to_open_key_] | pin_to_open_default_;
@@ -482,6 +539,7 @@ bool ICACHE_FLASH_ATTR LarpHackableRfidLock::loadConfiguration(const char* filen
 			//WiFi AP
 			wifi_ap_enabled_ = doc[wifi_ap_enabled_key_] | wifi_ap_enabled_default_;
 			wifi_ap_captive_portal_ = doc[wifi_ap_captive_portal_key_] | wifi_ap_captive_portal_default_;
+			wifi_ap_inactivity_shutdown_ = doc[wifi_ap_inactivity_shutdown_key_] | wifi_ap_inactivity_shutdown_default_;
 			wifi_ap_hidden_ = doc[wifi_ap_hidden_key_] | wifi_ap_hidden_default_;
 			wifi_ap_ssid_ = String(doc[wifi_ap_ssid_key_] | wifi_ap_ssid_default_);
 			wifi_ap_psk_ = String(doc[wifi_ap_psk_key_] | wifi_ap_psk_default_);
@@ -573,6 +631,9 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::displayCurrentConfiguration() {
 	} else {
 		debugStream_->println(F("<not set>"));
 	}
+	//Lock Picking
+	debugStream_->print(F("Lock picking enabled:"));
+	debugStream_->println(lock_picking_enabled_);
 	//PINs
 	debugStream_->print(F("PIN enabled:"));
 	debugStream_->println(pin_entry_enabled_);
@@ -699,6 +760,8 @@ bool ICACHE_FLASH_ATTR LarpHackableRfidLock::saveConfiguration(const char* filen
 		doc[tap_code_authorise_key_] = tap_code_authorise_;
 		doc[tap_code_revoke_key_] = tap_code_revoke_;
 		doc[tap_code_revoke_all_key_] = tap_code_revoke_all_;
+		//Lock picking
+		doc[lock_picking_enabled_key_] = lock_picking_enabled_;
 		//PIN codes
 		doc[pin_entry_enabled_key_] = pin_entry_enabled_;
 		doc[pin_to_open_key_] = pin_to_open_;
@@ -720,6 +783,7 @@ bool ICACHE_FLASH_ATTR LarpHackableRfidLock::saveConfiguration(const char* filen
 		//WiFi AP
 		doc[wifi_ap_enabled_key_] = wifi_ap_enabled_;
 		doc[wifi_ap_captive_portal_key_] = wifi_ap_captive_portal_;
+		doc[wifi_ap_inactivity_shutdown_key_] = wifi_ap_inactivity_shutdown_;
 		doc[wifi_ap_hidden_key_] = wifi_ap_hidden_;
 		doc[wifi_ap_ssid_key_] = wifi_ap_ssid_;
 		doc[wifi_ap_psk_key_] = wifi_ap_psk_;
@@ -951,8 +1015,13 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 				debugStream_->print(retrievedContent);
 				debugStream_->println('"');
 			}
-			if(multi_factor_type_ == multiFactorOption::partnerOnly || multi_factor_type_ == multiFactorOption::buttonAndPartner || multi_factor_type_ == multiFactorOption::cardAndPartner || multi_factor_type_ == multiFactorOption::PINandPartner || multi_factor_type_ == multiFactorOption::cardPINandPartner)	{
-				if((retrievedContent.equals("Ready to open") || retrievedContent.equals("Open")) && multi_factor_partner_state_ == false)	{
+			if(multi_factor_type_ == multiFactorOption::partnerOnly ||
+				multi_factor_type_ == multiFactorOption::buttonAndPartner ||
+				multi_factor_type_ == multiFactorOption::cardAndPartner ||
+				multi_factor_type_ == multiFactorOption::PINandPartner ||
+				multi_factor_type_ == multiFactorOption::cardPINandPartner)	{
+				if((retrievedContent.equals("Ready to open") ||
+						retrievedContent.equals("Open")) && multi_factor_partner_state_ == false)	{
 					multi_factor_partner_state_ = true;
 					last_multi_factor_interaction_ = millis();
 					mesh_partner_advertisement_interval_ = mesh_partner_advertisement_fast_interval_;
@@ -1000,8 +1069,11 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 		Serial.println(housekeepingdebug++);	//4
 	#endif
 	if(green_led_fitted_) {
-		if(green_led_state_ == true && green_led_on_time_ > 0 && millis() - green_led_state_last_changed_ > green_led_on_time_)	{	//Switch off the red LED after green_led_on_time_
+		if(green_led_state_ == true && green_led_on_time_ > 0 && millis() - green_led_state_last_changed_ > green_led_on_time_)	{	//Switch off the green LED after green_led_on_time_
 			greenLedOff();
+		}
+		if(green_led_state_ == false && green_led_off_time_ > 0 && millis() - green_led_state_last_changed_ > green_led_off_time_)	{	//Switch on the green LED after green_led_off_time_
+			greenLedOn(red_led_on_time_, green_led_off_time_);
 		}
 	}
 	#ifdef HOUSEKEEPING_DEBUG
@@ -1050,19 +1122,25 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 	#ifdef HOUSEKEEPING_DEBUG
 		Serial.println(housekeepingdebug++);	//9
 	#endif
-	if(tap_code_enabled_ == true && tapCode_ != nullptr)	{	//Only run the tap code sections if enabled
+	if(tap_code_enabled_ == true && tapCode_ != nullptr) {	//Only run the tap code sections if enabled
 		//Only read TapCode if the pin is not in use for something else, red/green buttons are sometimes shared with an LED
 		if((red_led_state_ == false || tapCode_pin_ != red_led_pin_) && (green_led_state_ == false || tapCode_pin_ != green_led_pin_))	{
 			tapCode_->read();
 		}
 	}
 	//Manage buttons
-	if(button1_fitted_ == true && button1_pin_ != tapCode_pin_ && button1_ != nullptr)	{	//Tap code reads the button separately
+	if(button1_fitted_ == true && button1_pin_ != tapCode_pin_ && button1_ != nullptr) {	//Tap code reads the button separately
 		//Only read button if the pin is not in use for something else, red/green buttons are sometimes shared with an LED
 		if((red_led_state_ == false || button1_pin_ != red_led_pin_) && (green_led_state_ == false || button1_pin_ != green_led_pin_))	{
 			this->button1_->read();	//Update EasyButton
 		}
 		if(this->button1_->isPressed() && button1_pressed_ == false)	{
+			speedUpProcessor();
+			/*
+			if(wifi_ap_enabled_ == true && wifi_ap_inactivity_shutdown_ == true && wifi_ap_active_ == false) {
+				reEnableWiFiAp();
+			}
+			*/
 			button1_pressed_ = true;
 			if(multi_factor_enabled_ == true && multi_factor_type_ == multiFactorOption::buttonAndPartner && open_button_pin_ == button1_pin_) {
 				multi_factor_button_state_ = true;
@@ -1090,11 +1168,17 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 	#ifdef HOUSEKEEPING_DEBUG
 		Serial.println(housekeepingdebug++);	//10
 	#endif
-	if(button2_fitted_ == true && button2_pin_ != tapCode_pin_&& button2_ != nullptr)	{	//Tap code reads the button separately
-		if((red_led_state_ == false || button2_pin_ != red_led_pin_) && (green_led_state_ == false || button2_pin_ != green_led_pin_))	{
+	if(button2_fitted_ == true && button2_pin_ != tapCode_pin_&& button2_ != nullptr) {		//Tap code reads the button separately
+		if((green_led_state_ == false || button2_pin_ != green_led_pin_) && (red_led_state_ == false || button2_pin_ != red_led_pin_))	{
 			this->button2_->read();	//Update EasyButton
 		}
 		if(this->button2_->isPressed() && button2_pressed_ == false)	{
+			speedUpProcessor();
+			/*
+			if(wifi_ap_enabled_ == true && wifi_ap_inactivity_shutdown_ == true && wifi_ap_active_ == false) {
+				reEnableWiFiAp();
+			}
+			*/
 			button2_pressed_ = true;
 			if(multi_factor_enabled_ == true && multi_factor_type_ == multiFactorOption::buttonAndPartner && open_button_pin_ == button2_pin_) {
 				multi_factor_button_state_ = true;
@@ -1106,8 +1190,20 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 					debugStream_->println(F("Button 2 pushed for multi-factor authorisation"));
 				}
 			} else {
-				if(debugStream_ != nullptr)	{
-					debugStream_->println(F("Button 2 pushed"));
+				if(lock_picking_enabled_ == true && lock_picking_pin_ == button2_pin_) {
+					lock_picking_timer_ = millis();
+					if(lock_picking_active_ == false) {
+						lock_picking_active_ = true;
+						if(debugStream_ != nullptr)	{
+							debugStream_->println(F("Lock picking started with button 2"));
+						}
+					}
+				}
+				else
+				{
+					if(debugStream_ != nullptr)	{
+						debugStream_->println(F("Button 2 pushed"));
+					}
 				}
 			}
 		}
@@ -1121,11 +1217,17 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 	#ifdef HOUSEKEEPING_DEBUG
 		Serial.println(housekeepingdebug++);	//11
 	#endif
-	if(button3_fitted_ == true && button3_pin_ != tapCode_pin_&& button3_ != nullptr)	{	//Tap code reads the button separately
+	if(button3_fitted_ == true && button3_pin_ != tapCode_pin_&& button3_ != nullptr) {		//Tap code reads the button separately
 		if((red_led_state_ == false || button3_pin_ != red_led_pin_) && (green_led_state_ == false || button3_pin_ != green_led_pin_))	{
 			this->button3_->read();	//Update EasyButton
 		}
 		if(this->button3_->isPressed() && button3_pressed_ == false)	{
+			speedUpProcessor();
+			/*
+			if(wifi_ap_enabled_ == true && wifi_ap_inactivity_shutdown_ == true && wifi_ap_active_ == false) {
+				reEnableWiFiAp();
+			}
+			*/
 			button3_pressed_ = true;
 			if(multi_factor_enabled_ == true && multi_factor_type_ == multiFactorOption::buttonAndPartner && open_button_pin_ == button3_pin_) {
 				multi_factor_button_state_ = true;
@@ -1137,8 +1239,20 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 					debugStream_->println(F("Button 3 pushed for multi-factor authorisation"));
 				}
 			} else {
-				if(debugStream_ != nullptr)	{
-					debugStream_->println(F("Button 3 pushed"));
+				if(lock_picking_enabled_ == true && lock_picking_pin_ == button3_pin_) {
+					lock_picking_timer_ = millis();
+					if(lock_picking_active_ == false) {
+						lock_picking_active_ = true;
+						if(debugStream_ != nullptr)	{
+							debugStream_->println(F("Lock picking started with button 3"));
+						}
+					}
+				}
+				else
+				{
+					if(debugStream_ != nullptr)	{
+						debugStream_->println(F("Button 3 pushed"));
+					}
 				}
 			}
 		}
@@ -1152,6 +1266,13 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 	#ifdef HOUSEKEEPING_DEBUG
 		Serial.println(housekeepingdebug++);	//12
 	#endif
+	//Manage lock picking
+	if(lock_picking_active_ == true && millis() - lock_picking_timer_ > 60E3) {
+		lock_picking_active_ = false;
+		if(debugStream_ != nullptr)	{
+			debugStream_->println(F("Lock picking timed out"));
+		}
+	}
 	//Manage keypad matrix
 	#ifdef HOUSEKEEPING_DEBUG
 		Serial.println(housekeepingdebug++);	//13
@@ -1159,6 +1280,7 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 	if(matrix_fitted_ == true && matrix_ != nullptr)	{
 		char matrixKeypress = matrix_->getKey();
 		if(matrixKeypress){
+			speedUpProcessor();
 			if(debugStream_ != nullptr)	{
 				debugStream_->print(F("Keypad: "));
 				debugStream_->println(String(matrixKeypress));
@@ -1167,7 +1289,9 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 				last_pin_entry_ = millis();
 				entered_pin_[pin_length_++] = matrixKeypress;
 				entered_pin_[pin_length_] = char(0);	//Null terminate the string
-				positiveFeedback();
+				if(lock_picking_active_ == false) {
+					positiveFeedback();
+				}
 			}
 			if(pin_length_ == abs_max_pin_length_ || pin_length_ == max_pin_length_)	{
 				if(debugStream_ != nullptr)	{
@@ -1278,6 +1402,7 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 	#endif
 	if(rfid_reader_intialised_ == true) {
 		if(cardPresent() && cardChanged())	{
+			speedUpProcessor();
 			if(rfidReaderState == RFID_READER_NORMAL)	{
 				if(lock_state_ == lock_state_option_::normal)	{
 					if(cardAuthorised(accessId()) == true)	{
@@ -1401,13 +1526,31 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 	#ifdef HOUSEKEEPING_DEBUG
 		Serial.println(housekeepingdebug++);
 	#endif
-	if(WiFi.softAPgetStationNum() != current_number_of_clients_) {
-		current_number_of_clients_ = WiFi.softAPgetStationNum();
-		if(debugStream_ != nullptr)	{
-			debugStream_->print(F("Number of WiFi clients:"));
-			debugStream_->print(current_number_of_clients_);
-			debugStream_->print('/');
-			debugStream_->println(maximum_number_of_clients_);
+	if(wifi_ap_active_ == true) {
+		uint8_t temp_number_of_clients_ = WiFi.softAPgetStationNum();
+		if(temp_number_of_clients_ != current_number_of_clients_) {
+			current_number_of_clients_ = temp_number_of_clients_;
+			wifi_ap_inactivity_shutdown_timer_ = millis();
+			if(debugStream_ != nullptr)	{
+				debugStream_->print(F("Number of WiFi clients:"));
+				debugStream_->print(current_number_of_clients_);
+				debugStream_->print('/');
+				debugStream_->println(maximum_number_of_clients_);
+			}
+		}
+		speedUpProcessor();
+		if(wifi_ap_inactivity_shutdown_ == true && 
+			wifi_client_enabled_ == false &&
+			millis() - wifi_ap_inactivity_shutdown_timer_ > 150e3) {	//Shut down inactive AP to save power
+			wifi_ap_active_ = false;
+			if(debugStream_ != nullptr)	{
+				debugStream_->println(F("WiFi AP inactive, shutting AP down"));
+			}
+			disableWiFiAp();
+		}
+	} else {
+		if(millis() - last_processor_wake_up_ > 10E3) {
+			slowDownProcessor();
 		}
 	}
 	#ifdef HOUSEKEEPING_DEBUG
@@ -1461,6 +1604,111 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 		last_lock_state_change_ = 0;
 		next_lock_state_change_ = 0;
 		lock_state_ = lock_state_option_::normal;
+	}
+}
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::setupPowerSaving() {
+	//Adjust the minimum speed based off type of module/crystal, there are limitations
+	if(getXtalFrequencyMhz() == 40) {
+		maximum_cpu_speed_ = 160;
+		working_cpu_speed_ = 80;
+		minimum_cpu_speed_ = 10;
+	} else if(getXtalFrequencyMhz() == 26) {
+		working_cpu_speed_ = 26;
+		minimum_cpu_speed_ = 13;
+	} else if(getXtalFrequencyMhz() == 24) {
+		working_cpu_speed_ = 24;
+		minimum_cpu_speed_ = 12;
+	} else {
+		minimum_cpu_speed_ = 80;
+	}
+	if(debugStream_ != nullptr)	{
+		debugStream_->print(F("Maxiumum CPU speed:"));
+		debugStream_->println(maximum_cpu_speed_);
+		debugStream_->print(F("Working CPU speed: "));
+		debugStream_->println(working_cpu_speed_);
+		debugStream_->print(F("Minimum CPU speed: "));
+		debugStream_->println(minimum_cpu_speed_);
+		/*
+		Serial.print(F("Processor slow timeout: "));
+		if(processorSlowTimeout > 0)
+		{
+		Serial.println(processorSlowTimeout);
+		}
+		else
+		{
+		Serial.println(F("disabled"));
+		}
+		Serial.print(F("Processor sleep timeout: "));
+		if(processorSleepTimeout > 0)
+		{
+		Serial.println(processorSleepTimeout);
+		}
+		else
+		{
+		Serial.println(F("disabled"));
+		}
+		Serial.print(F("Processor deep sleep threshold: "));
+		if(processorDeepSleepThreshold > 0)
+		{
+		Serial.println(processorDeepSleepThreshold);
+		}
+		else
+		{
+		Serial.println(F("disabled"));
+		}
+		Serial.print(F("Amplifier snooze timeout: "));
+		if(amplifierSnoozeTimeout > 0)
+		{
+		Serial.println(amplifierSnoozeTimeout);
+		}
+		else
+		{
+		Serial.println(F("disabled"));
+		}
+		Serial.print(F("Screen snooze timeout: "));
+		if(screenSnoozeTimeout > 0)
+		{
+		Serial.println(screenSnoozeTimeout);
+		}
+		else
+		{
+		Serial.println(F("disabled"));
+		}
+		*/
+	}
+}
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::speedUpProcessor() {
+	if(wifi_ap_active_ == true || wifi_client_enabled_ == true) {
+		if(current_number_of_clients_ > 0) {
+			speedUpProcessor(maximum_cpu_speed_);
+		} else {
+			speedUpProcessor(minimum_cpu_wifi_speed_);
+		}
+	} else {
+		speedUpProcessor(working_cpu_speed_);
+	}
+}
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::speedUpProcessor(uint8_t speed) {
+	if(speed != getCpuFrequencyMhz()) {
+		last_processor_wake_up_ = millis();
+		if(debugStream_ != nullptr)	{
+			debugStream_->print(F("Setting processor speed: "));
+			debugStream_->print(speed);
+			debugStream_->println(F("Mhz"));
+		}
+		setCpuFrequencyMhz(speed);
+		processor_awake_ = true;
+	}
+}
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::slowDownProcessor() {
+	if(processor_awake_ == true) {
+		if(debugStream_ != nullptr)	{
+			debugStream_->print(F("Slowing processor to minimum: "));
+			debugStream_->print(minimum_cpu_speed_);
+			debugStream_->println(F("Mhz"));
+		}
+		processor_awake_ = false;
+		setCpuFrequencyMhz(minimum_cpu_speed_);
 	}
 }
 
@@ -1711,7 +1959,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::enableGreenLed(uint8_t pin, uint8_t
 		green_led_pin_off_value_ = HIGH;
 	}
 }
-void ICACHE_FLASH_ATTR LarpHackableRfidLock::greenLedOn(uint32_t on_time)	{
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::greenLedOn(uint32_t on_time, uint32_t off_time)	{
 	if(green_led_fitted_)	{
 		if(green_led_state_ == false)	{
 			//A shared pin needs changing to an output
@@ -1731,12 +1979,14 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::greenLedOn(uint32_t on_time)	{
 				}
 			}
 		}
+		green_led_on_time_= on_time;
+		green_led_off_time_= off_time;
 	}
 }
-void ICACHE_FLASH_ATTR LarpHackableRfidLock::greenLedOff(uint32_t off_time)	{
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::greenLedOff(uint32_t off_time, uint32_t on_time)	{
 	if(green_led_fitted_)	{
 		if(green_led_state_ == true)	{
-			if((button1_fitted_ && green_led_pin_ == button1_pin_ )||(button2_fitted_ && green_led_pin_ == button2_pin_ )||(button1_fitted_ && green_led_pin_ == button3_pin_))	{
+			if((button1_fitted_ && green_led_pin_ == button1_pin_ )||(button2_fitted_ && green_led_pin_ == button2_pin_ )||(button3_fitted_ && green_led_pin_ == button3_pin_))	{
 				if(green_led_pin_off_value_ == HIGH)	{
 					pinMode(green_led_pin_, INPUT_PULLUP);
 				}	else	{
@@ -1756,6 +2006,8 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::greenLedOff(uint32_t off_time)	{
 				}
 			}
 		}
+		green_led_on_time_= on_time;
+		green_led_off_time_= off_time;
 	}
 }
 /*
@@ -1780,8 +2032,15 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::buzzerOn(uint16_t frequency, uint32
 		#if defined ESP8266
 			tone(buzzer_pin_, frequency, on_time);
 		#elif defined ESP32
-			ledcAttachPin(buzzer_pin_, 0);
-			ledcWriteTone(buzzer_channel_, frequency);
+			#ifdef ESP_IDF_VERSION_MAJOR // IDF 4+
+				#if ESP_IDF_VERSION_MAJOR == 4
+					ledcAttachPin(buzzer_pin_, buzzer_channel_);	//Old method
+					ledcWriteTone(buzzer_channel_, frequency);
+				#elif ESP_IDF_VERSION_MAJOR == 5
+					ledcAttach(buzzer_pin_, 440, 14);
+					ledcWriteTone(buzzer_pin_, frequency);
+				#endif
+			#endif
 		#endif
 		if(debugStream_ != nullptr)
 		{
@@ -1796,8 +2055,15 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::buzzerOff()	{
 		#if defined ESP8266
 			noTone(buzzer_pin_);
 		#elif defined ESP32
-			ledcWriteTone(buzzer_channel_, 0);
-			ledcDetachPin(buzzer_pin_);
+			#ifdef ESP_IDF_VERSION_MAJOR // IDF 4+
+				#if ESP_IDF_VERSION_MAJOR == 4
+					ledcWriteTone(buzzer_channel_, 0);
+					ledcDetachPin(buzzer_pin_);	//Old method
+				#elif ESP_IDF_VERSION_MAJOR == 5
+					ledcWriteTone(buzzer_pin_, 0);
+					ledcDetach(buzzer_pin_);
+				#endif
+			#endif
 			pinMode(buzzer_pin_, OUTPUT);
 			digitalWrite(buzzer_pin_, buzzer_pin_off_value_);
 		#endif
@@ -1832,6 +2098,12 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::allow()	{
 		lock_state_ = lock_state_option_::allow;
 		last_lock_state_change_ = millis();
 		next_lock_state_change_ = decisionLedOnTime;
+		if(lock_picking_active_ == true) {
+			if(debugStream_ != nullptr) {
+				debugStream_->println(F("Lock picking succesful"));
+			}
+			lock_picking_active_ = false;	//Cancel any ongoing lockpick attempt
+		}
 		if(debugStream_ != nullptr) {
 			debugStream_->println(F("Allowing access"));
 		}
@@ -1860,18 +2132,29 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::deny()	{
 	if(lock_state_ != lock_state_option_::deny) {
 		lock_state_ = lock_state_option_::deny;
 		last_lock_state_change_ = millis();
-		next_lock_state_change_ = decisionLedOnTime;
 		if(debugStream_ != nullptr) {
 			debugStream_->println(F("Denying access"));
 		}
-		if(buzzer_fitted_)	{
-			buzzerOn(musicalTone[6], decisionBuzzerOnTime);
-		}
-		if(red_led_fitted_)	{
-			redLedOn(decisionLedOnTime);
-		}
-		if(green_led_fitted_)	{
-			greenLedOff();
+		if(lock_picking_active_ == true) {
+			lock_picking_timer_ = millis();
+			next_lock_state_change_ = feedbackLedOnTime;
+			if(red_led_fitted_)	{
+				redLedOn(feedbackLedOnTime);
+			}
+			if(green_led_fitted_)	{
+				greenLedOff();
+			}
+		} else {
+			next_lock_state_change_ = decisionLedOnTime;
+			if(buzzer_fitted_)	{
+				buzzerOn(musicalTone[6], decisionBuzzerOnTime);
+			}
+			if(red_led_fitted_)	{
+				redLedOn(decisionLedOnTime);
+			}
+			if(green_led_fitted_)	{
+				greenLedOff();
+			}
 		}
 	}
 }
@@ -1880,6 +2163,12 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::unseal()	{
 		lock_state_ = lock_state_option_::unsealed;
 		last_lock_state_change_ = millis();
 		next_lock_state_change_ = 0;	//Stick in this state
+		if(lock_picking_active_ == true) {
+			if(debugStream_ != nullptr) {
+				debugStream_->println(F("Lock picking succesful"));
+			}
+			lock_picking_active_ = false;	//Cancel any ongoing lockpick attempt
+		}
 		if(debugStream_ != nullptr) {
 			debugStream_->println(F("Unsealing lock"));
 		}
@@ -1899,6 +2188,12 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::seal()	{
 		lock_state_ = lock_state_option_::sealed;
 		last_lock_state_change_ = millis();
 		next_lock_state_change_ = 0;	//Stick in this state
+		if(lock_picking_active_ == true) {
+			if(debugStream_ != nullptr) {
+				debugStream_->println(F("Lock picking succesful"));
+			}
+			lock_picking_active_ = false;	//Cancel any ongoing lockpick attempt
+		}
 		if(debugStream_ != nullptr) {
 			debugStream_->println(F("Sealing lock"));
 		}
@@ -1918,6 +2213,12 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::normal()	{
 		lock_state_ = lock_state_option_::normal;
 		last_lock_state_change_ = millis();
 		next_lock_state_change_ = 0;	//Stick in this state
+		if(lock_picking_active_ == true) {
+			if(debugStream_ != nullptr) {
+				debugStream_->println(F("Lock picking succesful"));
+			}
+			lock_picking_active_ = false;	//Cancel any ongoing lockpick attempt
+		}
 		if(debugStream_ != nullptr) {
 			debugStream_->println(F("Setting lock to normal state"));
 		}
@@ -2080,6 +2381,13 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::clearEnteredCode() {
 	{
 		tapCode_->reset();
 	}
+}
+/*
+ *	Lock Picking, which just enables fast entry of PIN codes
+ */
+void ICACHE_FLASH_ATTR LarpHackableRfidLock::enableLockPicking(uint8_t pin) {
+	lock_picking_enabled_ = true;
+	lock_picking_pin_ = pin;
 }
 /*
  *	Game

@@ -18,7 +18,9 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::startWebAdminInterface()	{
 	webAdminServer->on("/css/skeleton.css", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(LittleFS, "/css/skeleton.css", "text/css");});
 	webAdminServer->on("/images/favicon.png", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(LittleFS, "/images/favicon.png", "image/png");});
 	webAdminServer->on("/config", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(LittleFS, Lock.configuration_file_, "text/json");});
-	AsyncElegantOTA.begin(webAdminServer);
+	#if defined(ENABLE_OTA_UPDATE)
+		AsyncElegantOTA.begin(webAdminServer);
+	#endif
 	webAdminServer->begin();
 }
 
@@ -369,6 +371,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::webAdminGeneralSettingsSaveButtonPr
 		}
 		Lock.lock_name_ = String(Lock.web_admin_general_settings_page_text0_->value());
 		Lock.lock_access_group_ = String(Lock.web_admin_general_settings_page_text1_->value()).toInt();
+		Lock.web_admin_general_settings_page_save_button_->setVisible(false);
 		Lock.save_configuration_soon_ = millis();
 	}
 }
@@ -469,6 +472,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::web_admin_wifi_client_settings_page
 		Lock.ntp_client_enabled_ = Lock.web_admin_wifi_client_settings_page_check1_->isChecked();
 		Lock.ntp_server_ = String(Lock.web_admin_wifi_client_settings_page_text2_->value());
 		Lock.ntp_timezone_ = String(Lock.web_admin_wifi_client_settings_page_text3_->value());
+		Lock.web_admin_wifi_client_settings_page_save_button_->setVisible(false);
 		Lock.save_configuration_soon_ = millis();
 	}
 }
@@ -480,9 +484,11 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminWiFiAPSettingsPage()	
 	web_admin_wifi_ap_settings_page_static3_ = new EmbAJAXStatic(PSTR("<label for=\"psk\">PSK</label>"));
 	web_admin_wifi_ap_settings_page_static4_ = new EmbAJAXStatic(PSTR("WiFi AP hidden"));
 	web_admin_wifi_ap_settings_page_static5_ = new EmbAJAXStatic(PSTR("Captive portal"));
+	web_admin_wifi_ap_settings_page_static6_ = new EmbAJAXStatic(PSTR("Shutdown if inactive for 5 minutes"));
 	web_admin_wifi_ap_settings_page_check0_ = new EmbAJAXCheckButton(PSTR("check0"));
 	web_admin_wifi_ap_settings_page_check1_ = new EmbAJAXCheckButton(PSTR("check1"));
 	web_admin_wifi_ap_settings_page_check2_ = new EmbAJAXCheckButton(PSTR("check2"));
+	web_admin_wifi_ap_settings_page_check3_ = new EmbAJAXCheckButton(PSTR("check3"));
 	web_admin_wifi_ap_settings_page_text0_ = new EmbAJAXTextInput<64>(PSTR("ssid"));
 	web_admin_wifi_ap_settings_page_text1_ = new EmbAJAXTextInput<64>(PSTR("psk"));
 	web_admin_wifi_ap_settings_page_save_button_ = new EmbAJAXPushButton(PSTR("save"), PSTR("Save"), web_admin_wifi_ap_settings_page_save_button_pressed);
@@ -520,6 +526,16 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminWiFiAPSettingsPage()	
 			web_admin_wifi_ap_settings_page_elements_[index++] = endDiv_;
 		web_admin_wifi_ap_settings_page_elements_[index++] = endDiv_;
 		web_admin_wifi_ap_settings_page_elements_[index++] = startRowDiv_;
+			web_admin_wifi_ap_settings_page_elements_[index++] = startTwelveColumnDiv_;
+				web_admin_wifi_ap_settings_page_elements_[index++] = startLabel_;
+					web_admin_wifi_ap_settings_page_elements_[index++] = web_admin_wifi_ap_settings_page_check3_;
+					web_admin_wifi_ap_settings_page_elements_[index++] = startLabelSpan_;
+						web_admin_wifi_ap_settings_page_elements_[index++] = web_admin_wifi_ap_settings_page_static6_;
+					web_admin_wifi_ap_settings_page_elements_[index++] = endSpan_;
+				web_admin_wifi_ap_settings_page_elements_[index++] = endLabel_;
+			web_admin_wifi_ap_settings_page_elements_[index++] = endDiv_;
+		web_admin_wifi_ap_settings_page_elements_[index++] = endDiv_;
+		web_admin_wifi_ap_settings_page_elements_[index++] = startRowDiv_;
 			web_admin_wifi_ap_settings_page_elements_[index++] = startSixColumnDiv_;
 				web_admin_wifi_ap_settings_page_elements_[index++] = web_admin_wifi_ap_settings_page_static2_;
 				web_admin_wifi_ap_settings_page_elements_[index++] = web_admin_wifi_ap_settings_page_text0_;
@@ -538,11 +554,12 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminWiFiAPSettingsPage()	
 			web_admin_wifi_ap_settings_page_elements_[index++] = endDiv_;
 		web_admin_wifi_ap_settings_page_elements_[index++] = endDiv_;
 	web_admin_wifi_ap_settings_page_elements_[index++] = endDiv_;
-	web_admin_wifi_ap_settings_page_ = new EmbAJAXPage<50>(web_admin_wifi_ap_settings_page_elements_, PSTR("WiFi AP"), web_admin_header_includes_);
+	web_admin_wifi_ap_settings_page_ = new EmbAJAXPage<web_admin_wifi_ap_settings_page_element_count_>(web_admin_wifi_ap_settings_page_elements_, PSTR("WiFi AP"), web_admin_header_includes_);
 	webAdminInterface_->installPage(web_admin_wifi_ap_settings_page_, PSTR("/wifiap"), webAdminWiFiAPSettingsPageCallback);
 	web_admin_wifi_ap_settings_page_check0_->setChecked(wifi_ap_enabled_);
 	web_admin_wifi_ap_settings_page_check1_->setChecked(wifi_ap_hidden_);
 	web_admin_wifi_ap_settings_page_check2_->setChecked(wifi_ap_captive_portal_);
+	web_admin_wifi_ap_settings_page_check3_->setChecked(wifi_ap_inactivity_shutdown_);
 	web_admin_wifi_ap_settings_page_text0_->setValue(wifi_ap_ssid_.c_str());
 	web_admin_wifi_ap_settings_page_text1_->setValue(wifi_ap_psk_.c_str());
 }
@@ -561,8 +578,10 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::web_admin_wifi_ap_settings_page_sav
 		Lock.wifi_ap_enabled_ = Lock.web_admin_wifi_ap_settings_page_check0_->isChecked();
 		Lock.wifi_ap_hidden_ = Lock.web_admin_wifi_ap_settings_page_check1_->isChecked();
 		Lock.wifi_ap_captive_portal_ = Lock.web_admin_wifi_ap_settings_page_check2_->isChecked();
+		Lock.wifi_ap_inactivity_shutdown_ = Lock.web_admin_wifi_ap_settings_page_check3_->isChecked();
 		Lock.wifi_ap_ssid_ = String(Lock.web_admin_wifi_ap_settings_page_text0_->value());
 		Lock.wifi_ap_psk_ = String(Lock.web_admin_wifi_ap_settings_page_text1_->value());
+		Lock.web_admin_wifi_ap_settings_page_save_button_->setVisible(false);
 		Lock.save_configuration_soon_ = millis();
 	}
 }
@@ -659,6 +678,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::web_admin_m2mMesh_settings_page_sav
 		Lock.mesh_network_enabled_ = Lock.web_admin_m2mMesh_settings_page_check0_->isChecked();
 		Lock.mesh_network_channel_ = Lock.web_admin_m2mMesh_settings_page_select0_->selectedOption() + 1;
 		Lock.mesh_network_id_ = String(Lock.web_admin_m2mMesh_settings_page_text0_->value()).toInt();
+		Lock.web_admin_m2mMesh_settings_page_save_button_->setVisible(false);
 		Lock.save_configuration_soon_ = millis();
 	}
 }
@@ -669,7 +689,9 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminPINSettingsPage()	{
 	web_admin_pin_settings_page_static2_ = new EmbAJAXStatic(PSTR("<label for=\"open\">Open (opens the door once)</label>"));
 	web_admin_pin_settings_page_static3_ = new EmbAJAXStatic(PSTR("<label for=\"seal\">Seal (locks the door so it won't open)</label>"));
 	web_admin_pin_settings_page_static4_ = new EmbAJAXStatic(PSTR("<label for=\"unseal\">Unseal (unlocks the door so it stays open)</label>"));
+	web_admin_pin_settings_page_static5_ = new EmbAJAXStatic(PSTR("'Lock picking' (fast PIN entry) enabled"));
 	web_admin_pin_settings_page_check0_ = new EmbAJAXCheckButton(PSTR("check0"));
+	web_admin_pin_settings_page_check1_ = new EmbAJAXCheckButton(PSTR("check1"));
 	web_admin_pin_settings_page_text0_ = new EmbAJAXTextInput<abs_max_pin_length_>(PSTR("open"));
 	web_admin_pin_settings_page_text1_ = new EmbAJAXTextInput<abs_max_pin_length_>(PSTR("seal"));
 	web_admin_pin_settings_page_text2_ = new EmbAJAXTextInput<abs_max_pin_length_>(PSTR("unseal"));
@@ -685,6 +707,16 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminPINSettingsPage()	{
 					web_admin_pin_settings_page_elements_[index++] = web_admin_pin_settings_page_check0_;
 					web_admin_pin_settings_page_elements_[index++] = startLabelSpan_;
 						web_admin_pin_settings_page_elements_[index++] = web_admin_pin_settings_page_static1_;
+					web_admin_pin_settings_page_elements_[index++] = endSpan_;
+				web_admin_pin_settings_page_elements_[index++] = endLabel_;
+			web_admin_pin_settings_page_elements_[index++] = endDiv_;
+		web_admin_pin_settings_page_elements_[index++] = endDiv_;
+		web_admin_pin_settings_page_elements_[index++] = startRowDiv_;
+			web_admin_pin_settings_page_elements_[index++] = startTwelveColumnDiv_;
+				web_admin_pin_settings_page_elements_[index++] = startLabel_;
+					web_admin_pin_settings_page_elements_[index++] = web_admin_pin_settings_page_check1_;
+					web_admin_pin_settings_page_elements_[index++] = startLabelSpan_;
+						web_admin_pin_settings_page_elements_[index++] = web_admin_pin_settings_page_static5_;
 					web_admin_pin_settings_page_elements_[index++] = endSpan_;
 				web_admin_pin_settings_page_elements_[index++] = endLabel_;
 			web_admin_pin_settings_page_elements_[index++] = endDiv_;
@@ -716,9 +748,10 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminPINSettingsPage()	{
 			web_admin_pin_settings_page_elements_[index++] = endDiv_;
 		web_admin_pin_settings_page_elements_[index++] = endDiv_;
 	web_admin_pin_settings_page_elements_[index++] = endDiv_;
-	web_admin_pin_settings_page_ = new EmbAJAXPage<40>(web_admin_pin_settings_page_elements_, PSTR("PIN settings"), web_admin_header_includes_);
+	web_admin_pin_settings_page_ = new EmbAJAXPage<web_admin_pin_settings_page_element_count_>(web_admin_pin_settings_page_elements_, PSTR("PIN settings"), web_admin_header_includes_);
 	webAdminInterface_->installPage(web_admin_pin_settings_page_, PSTR("/pins"), webAdminPINSettingsPageCallback);
 	web_admin_pin_settings_page_check0_->setChecked(pin_entry_enabled_);
+	web_admin_pin_settings_page_check1_->setChecked(lock_picking_enabled_);
 	web_admin_pin_settings_page_text0_->setValue(pin_to_open_.c_str());
 	web_admin_pin_settings_page_text1_->setValue(pin_to_seal_.c_str());
 	web_admin_pin_settings_page_text2_->setValue(pin_to_unseal_.c_str());
@@ -736,9 +769,11 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::web_admin_pin_settings_page_save_bu
 	}
 	if(Lock.configuration_changed_ == true)	{
 		Lock.pin_entry_enabled_ = Lock.web_admin_pin_settings_page_check0_->isChecked();
+		Lock.lock_picking_enabled_ = Lock.web_admin_pin_settings_page_check1_->isChecked();
 		Lock.pin_to_open_ = String(Lock.web_admin_pin_settings_page_text0_->value());
 		Lock.pin_to_seal_ = String(Lock.web_admin_pin_settings_page_text1_->value());
 		Lock.pin_to_unseal_ = String(Lock.web_admin_pin_settings_page_text2_->value());
+		Lock.web_admin_pin_settings_page_save_button_->setVisible(false);
 		Lock.save_configuration_soon_ = millis();
 	}
 }
@@ -819,6 +854,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::webAdminTapCodeSettingsPageSaveButt
 		Lock.tap_code_open_ = String(Lock.web_admin_tap_code_settings_page_text0_->value());
 		Lock.tap_code_seal_ = String(Lock.web_admin_tap_code_settings_page_text1_->value());
 		Lock.tap_code_unseal_ = String(Lock.web_admin_tap_code_settings_page_text2_->value());
+		Lock.web_admin_tap_code_settings_page_save_button_->setVisible(false);
 		Lock.save_configuration_soon_ = millis();
 	}
 }
@@ -826,13 +862,13 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::webAdminTapCodeSettingsPageSaveButt
 void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminRFIDPage()	{
 	web_admin_rfid_settings_page_static0_ = new EmbAJAXStatic(PSTR("<h1>RFID provisioning</h1>"));
 	web_admin_rfid_settings_page_static1_ = new EmbAJAXStatic(PSTR("<p>These buttons will change the access for the NEXT card presented at the lock. This can be used for provisioning cards for this lock. Note the authorisation applies to all devices in the same group as this lock.</p>"));
-	web_admin_rfid_settings_page_static2_ = new EmbAJAXStatic(PSTR("<label for=\"button0\">Authorise next presented card</label>"));
-	web_admin_rfid_settings_page_static3_ = new EmbAJAXStatic(PSTR("<label for=\"button1\">revoke authorisation for next presented card</label>"));
-	web_admin_rfid_settings_page_static4_ = new EmbAJAXStatic(PSTR("<label for=\"button2\">Wipe ALL authorisations from next presented card</label>"));
+	web_admin_rfid_settings_page_static2_ = new EmbAJAXStatic(PSTR("<label for=\"button0\">Authorise next card</label>"));
+	web_admin_rfid_settings_page_static3_ = new EmbAJAXStatic(PSTR("<label for=\"button1\">Revoke authorisation of next card</label>"));
+	//web_admin_rfid_settings_page_static4_ = new EmbAJAXStatic(PSTR("<label for=\"button2\">Wipe ALL authorisations from next card</label>"));
 	web_admin_rfid_settings_page_static5_ = new EmbAJAXStatic(PSTR("RFID card entry enabled"));
 	web_admin_rfid_settings_page_button0_ = new EmbAJAXPushButton(PSTR("button0"), PSTR("Authorise"), web_admin_rfid_settings_page_button0_pressed);
 	web_admin_rfid_settings_page_button1_ = new EmbAJAXPushButton(PSTR("button1"), PSTR("Revoke"), web_admin_rfid_settings_page_button1_pressed);
-	web_admin_rfid_settings_page_button2_ = new EmbAJAXPushButton(PSTR("button2"), PSTR("Wipe ALL"), web_admin_rfid_settings_page_button2_pressed);
+	//web_admin_rfid_settings_page_button2_ = new EmbAJAXPushButton(PSTR("button2"), PSTR("Wipe ALL"), web_admin_rfid_settings_page_button2_pressed);
 	web_admin_rfid_settings_page_check0_ = new EmbAJAXCheckButton(PSTR("check0"));
 	web_admin_rfid_settings_page_save_button_ = new EmbAJAXPushButton(PSTR("save"), PSTR("Save"), webAdminRFIDSettingsPageSaveButtonPressed);
 	web_admin_rfid_settings_page_save_button_->setVisible(false);
@@ -881,6 +917,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminRFIDPage()	{
 				web_admin_rfid_settings_page_elements_[index++] = nbsp_;
 			web_admin_rfid_settings_page_elements_[index++] = endDiv_;
 		web_admin_rfid_settings_page_elements_[index++] = endDiv_;
+		/*
 		web_admin_rfid_settings_page_elements_[index++] = startRowDiv_;
 			web_admin_rfid_settings_page_elements_[index++] = startTwelveColumnDiv_;
 				web_admin_rfid_settings_page_elements_[index++] = web_admin_rfid_settings_page_static4_;
@@ -894,6 +931,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminRFIDPage()	{
 				web_admin_rfid_settings_page_elements_[index++] = nbsp_;
 			web_admin_rfid_settings_page_elements_[index++] = endDiv_;
 		web_admin_rfid_settings_page_elements_[index++] = endDiv_;
+		*/
 		web_admin_rfid_settings_page_elements_[index++] = startRowDiv_;
 			web_admin_rfid_settings_page_elements_[index++] = startTenColumnDiv_;
 				web_admin_rfid_settings_page_elements_[index++] = nbsp_;
@@ -903,7 +941,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminRFIDPage()	{
 			web_admin_rfid_settings_page_elements_[index++] = endDiv_;
 		web_admin_rfid_settings_page_elements_[index++] = endDiv_;
 	web_admin_rfid_settings_page_elements_[index++] = endDiv_;
-	web_admin_rfid_settings_page_ = new EmbAJAXPage<66>(web_admin_rfid_settings_page_elements_, PSTR("RFID"), web_admin_header_includes_);
+	web_admin_rfid_settings_page_ = new EmbAJAXPage<web_admin_rfid_settings_page_elements_count_>(web_admin_rfid_settings_page_elements_, PSTR("RFID"), web_admin_header_includes_);
 	webAdminInterface_->installPage(web_admin_rfid_settings_page_, PSTR("/rfid"), webAdminRFIDPageCallback);
 	web_admin_rfid_settings_page_check0_->setChecked(rfid_authorisation_enabled_);
 }
@@ -919,12 +957,14 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::web_admin_rfid_settings_page_button
 	}
 	Lock.rfidReaderState = Lock.RFID_READER_DENY_NEXT_CARD;
 }
+/*
 void ICACHE_FLASH_ATTR LarpHackableRfidLock::web_admin_rfid_settings_page_button2_pressed(EmbAJAXPushButton*)	{
 	if(Lock.debugStream_ != nullptr)	{
 		Lock.debugStream_->println(F("web_admin_rfid_settings_page_button2_pressed wipe"));
 	}
 	Lock.rfidReaderState = Lock.RFID_READER_WIPE_NEXT_CARD;
 }
+*/
 void ICACHE_FLASH_ATTR LarpHackableRfidLock::webAdminRFIDPageCallback()	{
 	if(Lock.debugStream_ != nullptr)	{
 		Lock.debugStream_->println(F("webAdminRFIDPageCallback"));
@@ -940,6 +980,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::webAdminRFIDSettingsPageSaveButtonP
 	}
 	if(Lock.configuration_changed_ == true)	{
 		Lock.rfid_authorisation_enabled_ = Lock.web_admin_rfid_settings_page_check0_->isChecked();
+		Lock.web_admin_rfid_settings_page_save_button_->setVisible(false);
 		Lock.save_configuration_soon_ = millis();
 	}
 }
@@ -1050,6 +1091,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::webAdminMQTTSettingsPageSaveButtonP
 		Lock.mqtt_username_ = String(Lock.web_admin_mqtt_settings_page_text3_->value());
 		Lock.mqtt_password_ = String(Lock.web_admin_mqtt_settings_page_text4_->value());
 		Lock.mqtt_topic_ = String(Lock.web_admin_mqtt_settings_page_text5_->value());
+		Lock.web_admin_mqtt_settings_page_save_button_->setVisible(false);
 		Lock.save_configuration_soon_ = millis();
 	}
 }
@@ -1152,10 +1194,10 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::webAdminGameSettingsPageSaveButtonP
 	}
 	if(Lock.configuration_changed_ == true)	{
 		Lock.game_enabled_ = Lock.web_admin_game_settings_page_check0_->isChecked();
-		Lock.game_enabled_ = Lock.web_admin_game_settings_page_check0_->isChecked();
 		Lock.game_type_ = Lock.web_admin_game_settings_page_radio0_->selectedOption();
 		Lock.game_length_ = Lock.web_admin_game_settings_page_slider0_->intValue ();
 		Lock.game_retries_ = Lock.web_admin_game_settings_page_slider1_->intValue ();
+		Lock.web_admin_game_settings_page_save_button_->setVisible(false);
 		Lock.save_configuration_soon_ = millis();
 	}
 }
@@ -1271,6 +1313,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::webAdminTwoFactorSettingsPageSaveBu
 		Lock.multi_factor_partner_name_ = String(Lock.web_admin_multi_factor_settings_page_text0_->value());
 		Lock.multi_factor_partner_type_ = (multiFactorPartnerOption)Lock.web_admin_multi_factor_settings_page_radio1_->selectedOption();
 		Lock.multi_factor_timeout_ = String(Lock.web_admin_multi_factor_settings_page_text1_->value()).toInt() * 1000;
+		Lock.web_admin_multi_factor_settings_page_save_button_->setVisible(false);
 		Lock.save_configuration_soon_ = millis();
 	}
 }

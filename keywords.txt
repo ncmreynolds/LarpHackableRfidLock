@@ -77,6 +77,10 @@ addCodeToDenyNextCard	KEYWORD2
 codeMatches	KEYWORD2
 clearEnteredCode	KEYWORD2
 
+//Tap code related
+enableLockPicking	KEYWORD2
+
+
 //Wi-Fi admin
 enableWiFiAdminInterface	KEYWORD2
 adminOpened	KEYWORD2

@@ -11,6 +11,7 @@
 #include <Arduino.h>
 
 #define WEBUI_IN_LIBRARY
+//#define ENABLE_OTA_UPDATE
 //#define DRD
 //#define HOUSEKEEPING_DEBUG
 #ifdef HOUSEKEEPING_DEBUG
@@ -48,11 +49,13 @@
 #endif
 #include <m2mMesh.h>						//Mesh network
 #include <FS.h>								//Filesystem admin routines
-#ifdef WEBUI_IN_LIBRARY
+#if defined(WEBUI_IN_LIBRARY)
 	//#include <AsyncTCP.h>						//Used for Web UI
 	#include <EmbAJAXOutputDriverESPAsync.h>	//Used for Web UI
 	#include <EmbAJAX.h>						//Used for Web UI
-	#include <AsyncElegantOTA.h>				//Used for OTA update
+	#if defined(ENABLE_OTA_UPDATE)
+		#include <AsyncElegantOTA.h>				//Used for OTA update
+	#endif
 #endif
 #include <DNSServer.h>						//Used for captive portal in Web UI
 #include <ArduinoJson.h>					//Used for configuration storage
@@ -96,9 +99,9 @@ class LarpHackableRfidLock	{
 			void enableButton3(uint8_t pin = 8);								//Enable button 3 on the default pin
 		#endif
 		#if defined(ARDUINO_ESP8266_WEMOS_D1MINI)
-			void enableServo(uint8_t pin = D4);								//Enable button 3 on the default pin
+			void enableServo(uint8_t pin = D4);									//Enable servo on the default pin
 		#elif defined(ARDUINO_ESP32C3_DEV)
-			void enableServo(uint8_t pin = 18);								//Enable button 3 on the default pin
+			void enableServo(uint8_t pin = 18);									//Enable servo on the default pin
 		#endif
 		uint8_t button1();														//Return the GPIO used for button 1
 		uint8_t button2();														//Return the GPIO used for button 2
@@ -148,8 +151,8 @@ class LarpHackableRfidLock	{
 		#elif defined(ARDUINO_ESP32C3_DEV)
 			void enableGreenLed(uint8_t pin = 9, uint8_t onLevel = LOW);		//Enable the red LED on the default pin
 		#endif
-		void greenLedOn(uint32_t on_time = 0);									//Switch on green LED. On time is 0 for permanent or otherwise in ms.
-		void greenLedOff(uint32_t off_time = 0);								//Switch off green LED. Off time is 0 for permanent or otherwise in ms.
+		void greenLedOn(uint32_t on_time = 0, uint32_t off_time = 0);			//Switch on green LED. On time is 0 for permanent or otherwise in ms.
+		void greenLedOff(uint32_t off_time = 0, uint32_t on_time = 0);			//Switch off green LED. Off time is 0 for permanent or otherwise in ms.
 		//Buzzer
 		#if defined(ARDUINO_ESP8266_WEMOS_D1MINI)
 			void enableBuzzer(uint8_t pin = D1);								//Enable the buzzer on the default pin
@@ -196,6 +199,12 @@ class LarpHackableRfidLock	{
 			void enableTapCode(uint8_t pin = RX);								//Enables the use of tap code on the lock
 		#elif defined(ARDUINO_ESP32C3_DEV)
 			void enableTapCode(uint8_t pin = 9);								//Enables the use of tap code on the lock
+		#endif
+		//Lockpicking mechanic using PIN entry
+		#if defined(ARDUINO_ESP8266_WEMOS_D1MINI)
+			void enableLockPicking(uint8_t pin = RX);							//Enables the use of 'lock picking' on the lock
+		#elif defined(ARDUINO_ESP32C3_DEV)
+			void enableLockPicking(uint8_t pin = 9);							//Enables the use of 'lock picking' on the lock
 		#endif
 		bool codeEntered();														//Has a code been entered?
 		bool addCodeToOpen(char* codeToAdd);
@@ -334,7 +343,11 @@ class LarpHackableRfidLock	{
 		uint8_t tapCode_pin_ = 255;												//GPIO pin used for TapCode
 		TapCode* tapCode_ = nullptr;											//Pointer to the tap code class, if enabled
 		static const uint8_t abs_max_tap_code_length_ = 16;
-		
+		//Lock picking
+		bool lock_picking_enabled_ = false;										//Is 'lock picking' enabled
+		uint8_t lock_picking_pin_ = 255;										//GPIO pin used for 'lock picking'
+		uint32_t lock_picking_timer_ = 0;										//Used to time out lock picking
+		bool lock_picking_active_ = false;										//True if lock picking is underway
 		//RFID related
 		TrivialRFIDauthorisation* rfid_ = nullptr;								//Pointer to the RFID wrapper class
 		uint8_t rfid_authorisation_sector_ = 0;									//Sector where the RFID authorisation block is stored
@@ -347,14 +360,43 @@ class LarpHackableRfidLock	{
 		uint16_t connectionRetryFrequency = 1000;								//Interval between retries in ms
 		
 		//IP/connection
-		void configureWifi();													//Start WiFi
+		void setWiFiMode();														//Enable WiFi
+		void disableWiFiAp();													//Disable WiFi AP to save power
+		void reEnableWiFiAp();													//Re-enable WiFi AP on activity
+		void configureWifi();													//Configure WiFi related things like the hostname
 		void printIpStatus_();													//Debug info about the IP status of the ESP
 		void printConnectionStatus_();											//Debug info about the connection status of the ESP
 		void configureTimeServer();												//Configure the time server
 		//Client connection
 		uint8_t current_number_of_clients_ = 0;
 		uint8_t maximum_number_of_clients_ = 4;
-				
+
+		//Power saving
+		#if ESP_IDF_VERSION_MAJOR > 3	// IDF 4+
+			#if CONFIG_IDF_TARGET_ESP32 // ESP32/PICO-D4
+				uint8_t maximum_cpu_speed_ = 240;								//Maximum CPU speed for ESP32
+			#elif CONFIG_IDF_TARGET_ESP32S2
+				uint8_t maximum_cpu_speed_ = 240;								//Maximum CPU speed for ESP32S2
+			#elif CONFIG_IDF_TARGET_ESP32S3
+				uint8_t maximum_cpu_speed_ = 240;								//Maximum CPU speed for ESP32S3
+			#elif CONFIG_IDF_TARGET_ESP32C3
+				uint8_t maximum_cpu_speed_ = 160;								//Maximum CPU speed for ESP32C3
+			#else 
+				#error Target CONFIG_IDF_TARGET is not supported
+			#endif
+		#else // ESP32 Before IDF 4.0
+			uint8_t maximum_cpu_speed_ = 240;									//Maximum CPU speed
+		#endif
+		uint8_t minimum_cpu_wifi_speed_ = 80;									//Working CPU speed with WiFi active
+		uint8_t working_cpu_speed_ = 80;										//Working CPU speed
+		uint8_t minimum_cpu_speed_ = 10;										//Minimum CPU speed
+		bool processor_awake_ = true;											//Is the CPU awake or at minimum speed
+		uint32_t last_processor_wake_up_ = 0;									//Track when processor was last fully woken up
+		void setupPowerSaving();												//Pick suitable CPU speeds based on type of ESP32
+		void speedUpProcessor();												//Wake up the processor to do stuff
+		void speedUpProcessor(uint8_t speed);									//Wake up the processor to do stuff
+		void slowDownProcessor();												//Slow down the processor to save power
+
 		//Web admin UI
 		#ifdef WEBUI_IN_LIBRARY
 			bool web_admin_server_enabled_ = true;									//Is the web admin server enabled
@@ -480,17 +522,20 @@ class LarpHackableRfidLock	{
 			static void webAdminWiFiClientSettingsPageCallback();							//Callback for Wifi client settings page
 			static void web_admin_wifi_client_settings_page_save_button_pressed(EmbAJAXPushButton*);
 			//WiFi AP
-			EmbAJAXPage<50>* web_admin_wifi_ap_settings_page_ = nullptr;
-			EmbAJAXBase* web_admin_wifi_ap_settings_page_elements_[50];
+			static const uint8_t web_admin_wifi_ap_settings_page_element_count_ = 60;
+			EmbAJAXPage<web_admin_wifi_ap_settings_page_element_count_>* web_admin_wifi_ap_settings_page_ = nullptr;
+			EmbAJAXBase* web_admin_wifi_ap_settings_page_elements_[web_admin_wifi_ap_settings_page_element_count_];
 			EmbAJAXStatic* web_admin_wifi_ap_settings_page_static0_ = nullptr;
 			EmbAJAXStatic* web_admin_wifi_ap_settings_page_static1_ = nullptr;
 			EmbAJAXStatic* web_admin_wifi_ap_settings_page_static2_ = nullptr;
 			EmbAJAXStatic* web_admin_wifi_ap_settings_page_static3_ = nullptr;
 			EmbAJAXStatic* web_admin_wifi_ap_settings_page_static4_ = nullptr;
 			EmbAJAXStatic* web_admin_wifi_ap_settings_page_static5_ = nullptr;
+			EmbAJAXStatic* web_admin_wifi_ap_settings_page_static6_ = nullptr;
 			EmbAJAXCheckButton* web_admin_wifi_ap_settings_page_check0_ = nullptr;
 			EmbAJAXCheckButton* web_admin_wifi_ap_settings_page_check1_ = nullptr;
 			EmbAJAXCheckButton* web_admin_wifi_ap_settings_page_check2_ = nullptr;
+			EmbAJAXCheckButton* web_admin_wifi_ap_settings_page_check3_ = nullptr;
 			EmbAJAXTextInput<64>* web_admin_wifi_ap_settings_page_text0_ = nullptr;
 			EmbAJAXTextInput<64>* web_admin_wifi_ap_settings_page_text1_ = nullptr;
 			EmbAJAXPushButton* web_admin_wifi_ap_settings_page_save_button_ = nullptr;
@@ -513,14 +558,17 @@ class LarpHackableRfidLock	{
 			static void webAdminM2mMeshSettingsPageCallback();							//Callback for m2mMesh settings page
 			static void web_admin_m2mMesh_settings_page_save_button_pressed(EmbAJAXPushButton*);
 			//PINs
-			EmbAJAXPage<40>* web_admin_pin_settings_page_ = nullptr;
-			EmbAJAXBase* web_admin_pin_settings_page_elements_[40];
+			static const uint8_t web_admin_pin_settings_page_element_count_ = 50;
+			EmbAJAXPage<web_admin_pin_settings_page_element_count_>* web_admin_pin_settings_page_ = nullptr;
+			EmbAJAXBase* web_admin_pin_settings_page_elements_[web_admin_pin_settings_page_element_count_];
 			EmbAJAXStatic* web_admin_pin_settings_page_static0_ = nullptr;
 			EmbAJAXStatic* web_admin_pin_settings_page_static1_ = nullptr;
 			EmbAJAXStatic* web_admin_pin_settings_page_static2_ = nullptr;
 			EmbAJAXStatic* web_admin_pin_settings_page_static3_ = nullptr;
 			EmbAJAXStatic* web_admin_pin_settings_page_static4_ = nullptr;
+			EmbAJAXStatic* web_admin_pin_settings_page_static5_ = nullptr;
 			EmbAJAXCheckButton* web_admin_pin_settings_page_check0_ = nullptr;
+			EmbAJAXCheckButton* web_admin_pin_settings_page_check1_ = nullptr;
 			EmbAJAXTextInput<abs_max_pin_length_>* web_admin_pin_settings_page_text0_ = nullptr;
 			EmbAJAXTextInput<abs_max_pin_length_>* web_admin_pin_settings_page_text1_ = nullptr;
 			EmbAJAXTextInput<abs_max_pin_length_>* web_admin_pin_settings_page_text2_ = nullptr;
@@ -545,17 +593,18 @@ class LarpHackableRfidLock	{
 			static void webAdminTapCodeSettingsPageCallback();
 			static void webAdminTapCodeSettingsPageSaveButtonPressed(EmbAJAXPushButton*);
 			//RFID provisioning
-			EmbAJAXPage<66>* web_admin_rfid_settings_page_ = nullptr;
-			EmbAJAXBase* web_admin_rfid_settings_page_elements_[66];
+			static const uint8_t web_admin_rfid_settings_page_elements_count_ = 53;
+			EmbAJAXPage<web_admin_rfid_settings_page_elements_count_>* web_admin_rfid_settings_page_ = nullptr;
+			EmbAJAXBase* web_admin_rfid_settings_page_elements_[web_admin_rfid_settings_page_elements_count_];
 			EmbAJAXStatic* web_admin_rfid_settings_page_static0_ = nullptr;
 			EmbAJAXStatic* web_admin_rfid_settings_page_static1_ = nullptr;
 			EmbAJAXStatic* web_admin_rfid_settings_page_static2_ = nullptr;
 			EmbAJAXStatic* web_admin_rfid_settings_page_static3_ = nullptr;
-			EmbAJAXStatic* web_admin_rfid_settings_page_static4_ = nullptr;
+			//EmbAJAXStatic* web_admin_rfid_settings_page_static4_ = nullptr;
 			EmbAJAXStatic* web_admin_rfid_settings_page_static5_ = nullptr;
 			EmbAJAXPushButton* web_admin_rfid_settings_page_button0_ = nullptr;
 			EmbAJAXPushButton* web_admin_rfid_settings_page_button1_ = nullptr;
-			EmbAJAXPushButton* web_admin_rfid_settings_page_button2_ = nullptr;
+			//EmbAJAXPushButton* web_admin_rfid_settings_page_button2_ = nullptr;
 			EmbAJAXCheckButton* web_admin_rfid_settings_page_check0_ = nullptr;
 			EmbAJAXPushButton* web_admin_rfid_settings_page_save_button_ = nullptr;
 			void createWebAdminRFIDPage();												//Create the web admin control page
@@ -674,6 +723,9 @@ class LarpHackableRfidLock	{
 		//Tap code
 		char tap_code_enabled_key_[15] = "tapCodeEnabled";
 		bool tap_code_enabled_default_ = false;
+		//Lock Picking
+		char lock_picking_enabled_key_[19] = "lockPickingEnabled";
+		bool lock_picking_enabled_default_ = false;
 		//Tap code positive feedback
 		bool tap_code_positive_feedback_ = false;
 		char tap_code_positive_feedback_key_[24] = "tapCodePositiveFeedback";
@@ -741,6 +793,7 @@ class LarpHackableRfidLock	{
 		bool wifi_ap_enabled_ = false;
 		String wifi_ap_enabled_key_ = PSTR("wifiApEnabled");
 		bool wifi_ap_enabled_default_ = true;
+		bool wifi_ap_active_ = false;
 		//Is the WiFi AP SSID hidden
 		bool wifi_ap_hidden_ = false;
 		String wifi_ap_hidden_key_ = PSTR("wifiApHidden");
@@ -749,6 +802,11 @@ class LarpHackableRfidLock	{
 		bool wifi_ap_captive_portal_ = true;
 		String wifi_ap_captive_portal_key_ = PSTR("wifiApCaptivePortal");
 		bool wifi_ap_captive_portal_default_ = true;
+		//Is the WiFi AP shutdown on inactivity
+		bool wifi_ap_inactivity_shutdown_ = false;
+		String wifi_ap_inactivity_shutdown_key_ = PSTR("wifiApInactiveShutdown");
+		bool wifi_ap_inactivity_shutdown_default_ = false;
+		uint32_t wifi_ap_inactivity_shutdown_timer_ = 0;
 		//WiFi AP channel
 		uint8_t wifi_ap_channel_ = 1;
 		//WiFi AP max clients

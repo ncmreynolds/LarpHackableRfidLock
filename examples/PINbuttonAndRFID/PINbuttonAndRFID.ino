@@ -34,24 +34,29 @@ void setup() {
       Lock.debug(SERIAL_DEBUG_PORT);
     }
   #endif
+  Lock.enableButton2(); //Enable button 2 on default pin, which will be used to start 'lock picking'
   Lock.enableRedLed();  //Enable the red LED on default pin
   Lock.enableGreenLed();  //Enable the green LED on default pin
   #ifndef DEBUG_ENABLED
     Lock.enableBuzzer();  //Enable the buzzer on the default pin
   #else
+    /*
     if(usbConnected() == false)
     {
       Lock.enableBuzzer();  //Enable the buzzer on the default pin
     }
+    */
   #endif
   Lock.enableMatrixKeypad();  //Enable the matrix keypad on default pins
   Lock.enableRFID();  //Enable RFID reader authorisation, CS on default pin, using default card sector
+  Lock.enableLockPicking(Lock.button2()); //Enable fast PIN entry if you push the 'lock picking' button
   Lock.begin(); //Start the lock with a default access ID
 }
 
 void loop() {
   Lock.housekeeping();  //This is all you need for basic functionality and interactive behaviour baked into the library
   #ifdef DEBUG_ENABLED
+  /*
     if(millis() - lastStats > 5000)
     {
       lastStats = millis();
@@ -59,6 +64,7 @@ void loop() {
       SERIAL_DEBUG_PORT.print(float(millis())/60000.0);
       SERIAL_DEBUG_PORT.println(F(" minutes"));
     }
+  */
   #endif
 }
 
