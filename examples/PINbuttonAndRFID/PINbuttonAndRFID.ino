@@ -38,7 +38,7 @@ void setup() {
   Lock.enableRedLed();  //Enable the red LED on default pin
   Lock.enableGreenLed();  //Enable the green LED on default pin
   #ifndef DEBUG_ENABLED
-    Lock.enableBuzzer();  //Enable the buzzer on the default pin
+    Lock.enableBuzzer();  //Enable the buzzer on the default pin. On the hardware I'm using the GPIO is shared with USB-CDC so disabled when DEBUG is enabled
   #else
     /*
     if(usbConnected() == false)
