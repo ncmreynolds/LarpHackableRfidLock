@@ -522,7 +522,7 @@ class LarpHackableRfidLock	{
 			static void webAdminWiFiClientSettingsPageCallback();							//Callback for Wifi client settings page
 			static void web_admin_wifi_client_settings_page_save_button_pressed(EmbAJAXPushButton*);
 			//WiFi AP
-			static const uint8_t web_admin_wifi_ap_settings_page_element_count_ = 60;
+			static const uint8_t web_admin_wifi_ap_settings_page_element_count_ = 70;
 			EmbAJAXPage<web_admin_wifi_ap_settings_page_element_count_>* web_admin_wifi_ap_settings_page_ = nullptr;
 			EmbAJAXBase* web_admin_wifi_ap_settings_page_elements_[web_admin_wifi_ap_settings_page_element_count_];
 			EmbAJAXStatic* web_admin_wifi_ap_settings_page_static0_ = nullptr;
@@ -532,10 +532,12 @@ class LarpHackableRfidLock	{
 			EmbAJAXStatic* web_admin_wifi_ap_settings_page_static4_ = nullptr;
 			EmbAJAXStatic* web_admin_wifi_ap_settings_page_static5_ = nullptr;
 			EmbAJAXStatic* web_admin_wifi_ap_settings_page_static6_ = nullptr;
+			EmbAJAXStatic* web_admin_wifi_ap_settings_page_static7_ = nullptr;
 			EmbAJAXCheckButton* web_admin_wifi_ap_settings_page_check0_ = nullptr;
 			EmbAJAXCheckButton* web_admin_wifi_ap_settings_page_check1_ = nullptr;
 			EmbAJAXCheckButton* web_admin_wifi_ap_settings_page_check2_ = nullptr;
 			EmbAJAXCheckButton* web_admin_wifi_ap_settings_page_check3_ = nullptr;
+			EmbAJAXCheckButton* web_admin_wifi_ap_settings_page_check4_ = nullptr;
 			EmbAJAXTextInput<64>* web_admin_wifi_ap_settings_page_text0_ = nullptr;
 			EmbAJAXTextInput<64>* web_admin_wifi_ap_settings_page_text1_ = nullptr;
 			EmbAJAXPushButton* web_admin_wifi_ap_settings_page_save_button_ = nullptr;
@@ -807,6 +809,10 @@ class LarpHackableRfidLock	{
 		String wifi_ap_inactivity_shutdown_key_ = PSTR("wifiApInactiveShutdown");
 		bool wifi_ap_inactivity_shutdown_default_ = false;
 		uint32_t wifi_ap_inactivity_shutdown_timer_ = 0;
+		//Is the WiFi AP limited to one client
+		bool wifi_ap_single_client_ = false;
+		String wifi_ap_single_client_key_ = PSTR("wifiApSingleClient");
+		bool wifi_ap_single_client_default_ = true;
 		//WiFi AP channel
 		uint8_t wifi_ap_channel_ = 1;
 		//WiFi AP max clients

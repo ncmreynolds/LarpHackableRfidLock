@@ -343,9 +343,9 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::configureWifi() {
 			debugStream_->print(wifi_ap_psk_);
 		}
 		#if defined(ESP8266)
-			if(WiFi.softAP(wifi_ap_ssid_, wifi_ap_psk_, wifi_ap_channel_, wifi_ap_hidden_, wifi_ap_maximum_clients_) == true) {
+			if(WiFi.softAP(wifi_ap_ssid_, wifi_ap_psk_, wifi_ap_channel_, wifi_ap_hidden_, (wifi_ap_single_client_ == true ? 1: wifi_ap_maximum_clients_)) == true) {
 		#elif defined(ESP32)
-			if(WiFi.softAP(wifi_ap_ssid_.c_str(), wifi_ap_psk_.c_str(), wifi_ap_channel_, (wifi_ap_hidden_ == true ? 1 : 0), wifi_ap_maximum_clients_, false) == true) {
+			if(WiFi.softAP(wifi_ap_ssid_.c_str(), wifi_ap_psk_.c_str(), wifi_ap_channel_, (wifi_ap_hidden_ == true ? 1 : 0), (wifi_ap_single_client_ == true ? 1: wifi_ap_maximum_clients_), false) == true) {
 		#endif
 			wifi_ap_active_ = true;
 			if(debugStream_ != nullptr) {
@@ -470,6 +470,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::loadDefaultConfiguration() {
 	wifi_ap_hidden_ = wifi_ap_hidden_default_;
 	wifi_ap_captive_portal_ = wifi_ap_captive_portal_default_;
 	wifi_ap_inactivity_shutdown_ = wifi_ap_inactivity_shutdown_default_;
+	wifi_ap_single_client_ = wifi_ap_single_client_default_;
 	wifi_ap_ssid_ = wifi_ap_ssid_default_;
 	wifi_ap_psk_ = wifi_ap_psk_default_;
 }
@@ -540,6 +541,7 @@ bool ICACHE_FLASH_ATTR LarpHackableRfidLock::loadConfiguration(const char* filen
 			wifi_ap_enabled_ = doc[wifi_ap_enabled_key_] | wifi_ap_enabled_default_;
 			wifi_ap_captive_portal_ = doc[wifi_ap_captive_portal_key_] | wifi_ap_captive_portal_default_;
 			wifi_ap_inactivity_shutdown_ = doc[wifi_ap_inactivity_shutdown_key_] | wifi_ap_inactivity_shutdown_default_;
+			wifi_ap_single_client_ = doc[wifi_ap_single_client_key_] | wifi_ap_single_client_default_;
 			wifi_ap_hidden_ = doc[wifi_ap_hidden_key_] | wifi_ap_hidden_default_;
 			wifi_ap_ssid_ = String(doc[wifi_ap_ssid_key_] | wifi_ap_ssid_default_);
 			wifi_ap_psk_ = String(doc[wifi_ap_psk_key_] | wifi_ap_psk_default_);
@@ -784,6 +786,7 @@ bool ICACHE_FLASH_ATTR LarpHackableRfidLock::saveConfiguration(const char* filen
 		doc[wifi_ap_enabled_key_] = wifi_ap_enabled_;
 		doc[wifi_ap_captive_portal_key_] = wifi_ap_captive_portal_;
 		doc[wifi_ap_inactivity_shutdown_key_] = wifi_ap_inactivity_shutdown_;
+		doc[wifi_ap_single_client_key_] = wifi_ap_single_client_;
 		doc[wifi_ap_hidden_key_] = wifi_ap_hidden_;
 		doc[wifi_ap_ssid_key_] = wifi_ap_ssid_;
 		doc[wifi_ap_psk_key_] = wifi_ap_psk_;
@@ -1532,10 +1535,18 @@ void  ICACHE_FLASH_ATTR LarpHackableRfidLock::housekeeping(){
 			current_number_of_clients_ = temp_number_of_clients_;
 			wifi_ap_inactivity_shutdown_timer_ = millis();
 			if(debugStream_ != nullptr)	{
-				debugStream_->print(F("Number of WiFi clients:"));
-				debugStream_->print(current_number_of_clients_);
-				debugStream_->print('/');
-				debugStream_->println(maximum_number_of_clients_);
+				if(wifi_ap_single_client_) {
+					if(current_number_of_clients_ > 0) {
+						debugStream_->println(PSTR("WiFi client connected"));
+					} else {
+						debugStream_->println(PSTR("WiFi client disconnected"));
+					}
+				} else {
+					debugStream_->print(F("Number of WiFi clients:"));
+					debugStream_->print(current_number_of_clients_);
+					debugStream_->print('/');
+					debugStream_->println(maximum_number_of_clients_);
+				}
 			}
 		}
 		speedUpProcessor();

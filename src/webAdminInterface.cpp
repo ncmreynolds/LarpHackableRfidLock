@@ -92,8 +92,8 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminStatusPage()	{
 	web_admin_status_page_button0_ = new EmbAJAXPushButton(PSTR("button0"), PSTR("Restart"), web_admin_status_page_button0_pressed);
 	web_admin_status_page_info00_ = new EmbAJAXMutableSpan(PSTR("info00"));	//Name
 	web_admin_status_page_info01_ = new EmbAJAXMutableSpan(PSTR("info01"));	//WiFi
-	web_admin_status_page_info02_ = new EmbAJAXMutableSpan(PSTR("info02"));	//NTP
-	web_admin_status_page_info03_ = new EmbAJAXMutableSpan(PSTR("info03"));	//AP
+	web_admin_status_page_info02_ = new EmbAJAXMutableSpan(PSTR("info02"));	//AP
+	web_admin_status_page_info03_ = new EmbAJAXMutableSpan(PSTR("info03"));	//NTP
 	web_admin_status_page_info04_ = new EmbAJAXMutableSpan(PSTR("info04"));	//Mesh
 	web_admin_status_page_info05_ = new EmbAJAXMutableSpan(PSTR("info05"));	//PIN entry
 	web_admin_status_page_info06_ = new EmbAJAXMutableSpan(PSTR("info06"));	//RFID entry
@@ -120,12 +120,12 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminStatusPage()	{
 						web_admin_status_page_elements_[index++] = web_admin_status_page_info01_;
 					web_admin_status_page_elements_[index++] = endLi_;
 					web_admin_status_page_elements_[index++] = startLi_;
-						web_admin_status_page_elements_[index++] = web_admin_status_page_static6_;
-						web_admin_status_page_elements_[index++] = web_admin_status_page_info02_;
-					web_admin_status_page_elements_[index++] = endLi_;
-					web_admin_status_page_elements_[index++] = startLi_;
 						web_admin_status_page_elements_[index++] = web_admin_status_page_static7_;
 						web_admin_status_page_elements_[index++] = web_admin_status_page_info03_;
+					web_admin_status_page_elements_[index++] = endLi_;
+					web_admin_status_page_elements_[index++] = startLi_;
+						web_admin_status_page_elements_[index++] = web_admin_status_page_static6_;
+						web_admin_status_page_elements_[index++] = web_admin_status_page_info02_;
 					web_admin_status_page_elements_[index++] = endLi_;
 					web_admin_status_page_elements_[index++] = startLi_;
 						web_admin_status_page_elements_[index++] = web_admin_status_page_static8_;
@@ -197,7 +197,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::web_admin_status_page_button0_press
 void ICACHE_FLASH_ATTR LarpHackableRfidLock::webAdminStatusPageUpdate()	{
 	web_admin_status_page_info01_->setValue(wifi_client_enabled_ == true ? (WiFi.status() == WL_CONNECTED ? PSTR("Connected") : PSTR("Enabled")) : PSTR("Disabled"));
 	web_admin_status_page_info02_->setValue(wifi_ap_enabled_ == true ? PSTR("Enabled") : PSTR("Disabled"));
-	web_admin_status_page_info03_->setValue(ntp_client_enabled_ == true ? PSTR("Enabled") : PSTR("Disabled"));
+	web_admin_status_page_info03_->setValue(wifi_client_enabled_ == true ? (ntp_client_enabled_ == true ? PSTR("Enabled") : PSTR("Disabled")) : PSTR("N/A"));
 	web_admin_status_page_info04_->setValue(mesh_network_enabled_ == true ? (mesh_network_started_ == true ? (mesh_network_joined_ == true ? (mesh_partner_online_ == true ? PSTR("Partnered") : PSTR("Joined")) : PSTR("No peers")) : PSTR("Not started")) : PSTR("Disabled"));
 	web_admin_status_page_info05_->setValue(pin_entry_enabled_ == true ? PSTR("Enabled") : PSTR("Disabled"));
 	web_admin_status_page_info06_->setValue(rfid_authorisation_enabled_ == true ? (rfid_reader_intialised_ == true ? PSTR("Enabled & ready") : PSTR("Enabled but not ready")) : PSTR("Disabled"));
@@ -485,10 +485,12 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminWiFiAPSettingsPage()	
 	web_admin_wifi_ap_settings_page_static4_ = new EmbAJAXStatic(PSTR("WiFi AP hidden"));
 	web_admin_wifi_ap_settings_page_static5_ = new EmbAJAXStatic(PSTR("Captive portal"));
 	web_admin_wifi_ap_settings_page_static6_ = new EmbAJAXStatic(PSTR("Shutdown if inactive for 5 minutes"));
+	web_admin_wifi_ap_settings_page_static7_ = new EmbAJAXStatic(PSTR("Limit to one client"));
 	web_admin_wifi_ap_settings_page_check0_ = new EmbAJAXCheckButton(PSTR("check0"));
 	web_admin_wifi_ap_settings_page_check1_ = new EmbAJAXCheckButton(PSTR("check1"));
 	web_admin_wifi_ap_settings_page_check2_ = new EmbAJAXCheckButton(PSTR("check2"));
 	web_admin_wifi_ap_settings_page_check3_ = new EmbAJAXCheckButton(PSTR("check3"));
+	web_admin_wifi_ap_settings_page_check4_ = new EmbAJAXCheckButton(PSTR("check4"));
 	web_admin_wifi_ap_settings_page_text0_ = new EmbAJAXTextInput<64>(PSTR("ssid"));
 	web_admin_wifi_ap_settings_page_text1_ = new EmbAJAXTextInput<64>(PSTR("psk"));
 	web_admin_wifi_ap_settings_page_save_button_ = new EmbAJAXPushButton(PSTR("save"), PSTR("Save"), web_admin_wifi_ap_settings_page_save_button_pressed);
@@ -536,6 +538,16 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminWiFiAPSettingsPage()	
 			web_admin_wifi_ap_settings_page_elements_[index++] = endDiv_;
 		web_admin_wifi_ap_settings_page_elements_[index++] = endDiv_;
 		web_admin_wifi_ap_settings_page_elements_[index++] = startRowDiv_;
+			web_admin_wifi_ap_settings_page_elements_[index++] = startTwelveColumnDiv_;
+				web_admin_wifi_ap_settings_page_elements_[index++] = startLabel_;
+					web_admin_wifi_ap_settings_page_elements_[index++] = web_admin_wifi_ap_settings_page_check4_;
+					web_admin_wifi_ap_settings_page_elements_[index++] = startLabelSpan_;
+						web_admin_wifi_ap_settings_page_elements_[index++] = web_admin_wifi_ap_settings_page_static7_;
+					web_admin_wifi_ap_settings_page_elements_[index++] = endSpan_;
+				web_admin_wifi_ap_settings_page_elements_[index++] = endLabel_;
+			web_admin_wifi_ap_settings_page_elements_[index++] = endDiv_;
+		web_admin_wifi_ap_settings_page_elements_[index++] = endDiv_;
+		web_admin_wifi_ap_settings_page_elements_[index++] = startRowDiv_;
 			web_admin_wifi_ap_settings_page_elements_[index++] = startSixColumnDiv_;
 				web_admin_wifi_ap_settings_page_elements_[index++] = web_admin_wifi_ap_settings_page_static2_;
 				web_admin_wifi_ap_settings_page_elements_[index++] = web_admin_wifi_ap_settings_page_text0_;
@@ -560,6 +572,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::createWebAdminWiFiAPSettingsPage()	
 	web_admin_wifi_ap_settings_page_check1_->setChecked(wifi_ap_hidden_);
 	web_admin_wifi_ap_settings_page_check2_->setChecked(wifi_ap_captive_portal_);
 	web_admin_wifi_ap_settings_page_check3_->setChecked(wifi_ap_inactivity_shutdown_);
+	web_admin_wifi_ap_settings_page_check4_->setChecked(wifi_ap_single_client_);
 	web_admin_wifi_ap_settings_page_text0_->setValue(wifi_ap_ssid_.c_str());
 	web_admin_wifi_ap_settings_page_text1_->setValue(wifi_ap_psk_.c_str());
 }
@@ -579,6 +592,7 @@ void ICACHE_FLASH_ATTR LarpHackableRfidLock::web_admin_wifi_ap_settings_page_sav
 		Lock.wifi_ap_hidden_ = Lock.web_admin_wifi_ap_settings_page_check1_->isChecked();
 		Lock.wifi_ap_captive_portal_ = Lock.web_admin_wifi_ap_settings_page_check2_->isChecked();
 		Lock.wifi_ap_inactivity_shutdown_ = Lock.web_admin_wifi_ap_settings_page_check3_->isChecked();
+		Lock.wifi_ap_single_client_ = Lock.web_admin_wifi_ap_settings_page_check4_->isChecked();
 		Lock.wifi_ap_ssid_ = String(Lock.web_admin_wifi_ap_settings_page_text0_->value());
 		Lock.wifi_ap_psk_ = String(Lock.web_admin_wifi_ap_settings_page_text1_->value());
 		Lock.web_admin_wifi_ap_settings_page_save_button_->setVisible(false);
